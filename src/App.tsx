@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -10,10 +10,11 @@ import {
   YAxis,
 } from "recharts";
 import { tallyApi } from "./api/client";
-import type { DateRange, FileOut, ProductionSummaryRow } from "./api/types";
+import type { DateRange, FileOut, ProductionSummaryRow, RecoveryRow } from "./api/types";
 import { DataTable, type Column } from "./components/DataTable";
 import { Panel } from "./components/Panel";
 import { QueryState } from "./components/QueryState";
+import treeLogo from "./img/tree.svg";
 
 const number = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const money = new Intl.NumberFormat("en-US", {
@@ -36,10 +37,32 @@ function sum(values: Array<number | null | undefined>) {
   return values.reduce<number>((total, value) => total + (value ?? 0), 0);
 }
 
+const plcOptions = [
+  "Board Edger",
+  "Chopsaw",
+  "Twin",
+  "BakerInFeed",
+  "Single",
+  "Gang",
+  "Swede",
+  "Trimmer",
+  "Debarker",
+  "Baker",
+  "Quad",
+] as const;
+
+type ProductionDisplayRow = ProductionSummaryRow & Pick<
+  RecoveryRow,
+  "recovery_lrf_bf_cm" | "recovery_bf_cf" | "fiber_ratio"
+>;
+
 export function App() {
   const [draftRange, setDraftRange] = useState<DateRange>(todayRange);
   const [range, setRange] = useState<DateRange>(todayRange);
+  const [selectedPlc, setSelectedPlc] = useState<(typeof plcOptions)[number]>("Board Edger");
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
+  const [rawJsonOpen, setRawJsonOpen] = useState(false);
+  const gradeChartRef = useRef<HTMLDivElement>(null);
   const invalidRange = Boolean(draftRange.start && draftRange.end && draftRange.start > draftRange.end);
 
   useQuery({
@@ -48,27 +71,27 @@ export function App() {
     refetchInterval: 60_000,
   });
   const files = useQuery({
-    queryKey: ["files", range],
+    queryKey: ["files", selectedPlc, range],
     queryFn: ({ signal }) => tallyApi.files(range, signal),
   });
   const production = useQuery({
-    queryKey: ["production-summary", range],
+    queryKey: ["production-summary", selectedPlc, range],
     queryFn: ({ signal }) => tallyApi.productionSummary(range, signal),
   });
   const recovery = useQuery({
-    queryKey: ["recovery", range],
+    queryKey: ["recovery", selectedPlc, range],
     queryFn: ({ signal }) => tallyApi.recovery(range, signal),
   });
   const solutions = useQuery({
-    queryKey: ["solution-totals", range],
+    queryKey: ["solution-totals", selectedPlc, range],
     queryFn: ({ signal }) => tallyApi.solutionTotals(range, signal),
   });
   const rejects = useQuery({
-    queryKey: ["reject-reason-totals", range],
+    queryKey: ["reject-reason-totals", selectedPlc, range],
     queryFn: ({ signal }) => tallyApi.rejectReasonTotals(range, signal),
   });
   const gradeMix = useQuery({
-    queryKey: ["grade-mix", range],
+    queryKey: ["grade-mix", selectedPlc, range],
     queryFn: ({ signal }) => tallyApi.gradeMix(range, signal),
   });
   const fileDetail = useQuery({
@@ -81,20 +104,42 @@ export function App() {
     const rows = production.data ?? [];
     return [
       { label: "Reports", value: number.format(files.data?.length ?? 0) },
-      { label: "Input pieces", value: number.format(sum(rows.map((row) => row.board_input_pieces))) },
-      { label: "Input volume", value: number.format(sum(rows.map((row) => row.board_input_cuft))), unit: "cu ft" },
-      { label: "Edger output", value: number.format(sum(rows.map((row) => row.edger_bd_ft))), unit: "bd ft" },
-      { label: "Lumber value", value: money.format(sum(rows.map((row) => row.lumber_value))) },
+      { label: "Input Pieces", value: number.format(sum(rows.map((row) => row.board_input_pieces))) },
+      { label: "Input Volume", value: number.format(sum(rows.map((row) => row.board_input_cuft))), unit: "cu ft" },
+      { label: "Edger Output", value: number.format(sum(rows.map((row) => row.edger_bd_ft))), unit: "bd ft" },
+      { label: "Projected Lumber Value", value: money.format(sum(rows.map((row) => row.lumber_value))) },
     ];
   }, [files.data, production.data]);
 
-  const productionColumns: Array<Column<ProductionSummaryRow>> = [
+  const productionRows = useMemo<Array<ProductionDisplayRow>>(() => {
+    const recoveryByFile = new Map((recovery.data ?? []).map((row) => [row.file_id, row]));
+    return (production.data ?? []).map((row) => {
+      const recoveryRow = recoveryByFile.get(row.file_id);
+      return {
+        ...row,
+        recovery_lrf_bf_cm: recoveryRow?.recovery_lrf_bf_cm,
+        recovery_bf_cf: recoveryRow?.recovery_bf_cf,
+        fiber_ratio: recoveryRow?.fiber_ratio,
+      };
+    });
+  }, [production.data, recovery.data]);
+
+  const productionColumns: Array<Column<ProductionDisplayRow>> = [
     { key: "date", label: "Report date", render: (row) => row.report_datetime },
-    { key: "file", label: "File", render: (row) => row.filename },
+    { key: "start", label: "Start time", render: (row) => display(row.time_start) },
+    { key: "run", label: "Run time", render: (row) => display(row.time_run) },
+    { key: "no-production", label: "No production", render: (row) => display(row.time_no_production) },
     { key: "pieces", label: "Input pieces", numeric: true, render: (row) => display(row.board_input_pieces) },
     { key: "cuft", label: "Input cu ft", numeric: true, render: (row) => display(row.board_input_cuft) },
+    { key: "average-length", label: "Avg length ft", numeric: true, render: (row) => display(row.average_length_ft) },
     { key: "bdft", label: "Edger bd ft", numeric: true, render: (row) => display(row.edger_bd_ft) },
+    { key: "trim-count", label: "Trim passes", numeric: true, render: (row) => display(row.trim_pass_count) },
+    { key: "trim-bdft", label: "Trim pass bd ft", numeric: true, render: (row) => display(row.trim_pass_bd_ft) },
     { key: "value", label: "Lumber value", numeric: true, render: (row) => display(row.lumber_value, money) },
+    { key: "deducts", label: "Value deducts", numeric: true, render: (row) => display(row.lumber_value_deducts, money) },
+    { key: "lrf", label: "LRF BF/CM", numeric: true, render: (row) => display(row.recovery_lrf_bf_cm) },
+    { key: "recovery", label: "Recovery BF/CF", numeric: true, render: (row) => display(row.recovery_bf_cf) },
+    { key: "fiber", label: "Fiber ratio", numeric: true, render: (row) => display(row.fiber_ratio) },
   ];
 
   const fileColumns: Array<Column<FileOut>> = [
@@ -136,25 +181,41 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <a className="brand" href="#overview" aria-label="Tally Dashboard home">
-          <span className="brand-mark" aria-hidden="true">T</span>
+          <span className="brand-mark" aria-hidden="true">
+            <img src={treeLogo} alt="" />
+          </span>
           <span>Tally Dashboard</span>
         </a>
         <nav aria-label="Dashboard sections">
           <a className="nav-link active" href="#overview">Overview</a>
           <a className="nav-link" href="#production">Production</a>
-          <a className="nav-link" href="#recovery">Recovery</a>
           <a className="nav-link" href="#reports">Reports</a>
         </nav>
-        <p className="sidebar-note">Lumber production reporting</p>
       </aside>
 
       <div className="dashboard-surface">
         <header className="page-header">
           <div>
             <p className="eyebrow">Operations</p>
-            <h1>Production overview</h1>
+            <h1>Production Overview</h1>
           </div>
-          {isRefreshing && <span className="refresh-status" aria-live="polite">Refreshing…</span>}
+          <div className="plc-control">
+            <select
+              id="plc-select"
+              value={selectedPlc}
+              onChange={(event) => {
+                setSelectedPlc(event.target.value as (typeof plcOptions)[number]);
+                setSelectedFileId(null);
+              }}
+            >
+              {plcOptions.map((plc) => (
+                <option key={plc} value={plc} disabled={plc !== "Board Edger"}>
+                  {plc}
+                </option>
+              ))}
+            </select>
+            {isRefreshing && <span className="refresh-status" aria-live="polite">Refreshing…</span>}
+          </div>
         </header>
 
         <main id="overview">
@@ -177,6 +238,7 @@ export function App() {
             <label>
               End date
               <input
+                className="calendar-input"
                 type="date"
                 value={draftRange.end}
                 min={draftRange.start || undefined}
@@ -205,12 +267,12 @@ export function App() {
 
         <div className="dashboard-grid">
           <section id="production" className="wide-panel section-anchor">
-          <Panel title="Production summary" eyebrow="Report rows">
+          <Panel title="Production Summary" eyebrow="Report rows">
             <QueryState isPending={production.isPending} error={production.error}>
               <DataTable
-                caption="Production summary"
+                caption="Production Summary"
                 columns={productionColumns}
-                rows={production.data ?? []}
+                rows={productionRows}
                 rowKey={(row) => String(row.file_id)}
                 emptyMessage="No production rows were returned for these dates."
               />
@@ -218,16 +280,34 @@ export function App() {
           </Panel>
           </section>
 
-          <Panel title="Grade mix" eyebrow="Board feet by grade">
+          <Panel title="Grade Mix" eyebrow="Board feet by grade" className="grade-mix-panel wide-panel">
             <QueryState isPending={gradeMix.isPending} error={gradeMix.error}>
               {(gradeMix.data?.length ?? 0) > 0 ? (
-                <div className="chart-wrap" aria-label="Grade mix bar chart">
+                <div className="chart-wrap" aria-label="Grade mix bar chart" ref={gradeChartRef}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={gradeMix.data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                    <BarChart
+                      data={gradeMix.data}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
+                      onMouseMove={(_, event) => {
+                        const chart = gradeChartRef.current;
+                        const tooltip = chart?.querySelector<HTMLElement>(".recharts-tooltip-wrapper");
+                        if (!chart || !tooltip) return;
+
+                        const bounds = chart.getBoundingClientRect();
+                        const x = event.clientX - bounds.left + 14;
+                        const y = event.clientY - bounds.top + 14;
+                        tooltip.style.transform = `translate(${x}px, ${y}px)`;
+                      }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="grade" tickLine={false} />
                       <YAxis tickLine={false} width={54} />
-                      <Tooltip formatter={(value) => [number.format(Number(value)), "Board feet"]} />
+                      <Tooltip
+                        position={{ x: 0, y: 0 }}
+                        isAnimationActive={false}
+                        cursor={false}
+                        formatter={(value) => [number.format(Number(value)), "Board feet"]}
+                      />
                       <Bar dataKey="total_bd_ft" fill="#d9963b" radius={[5, 5, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -236,29 +316,10 @@ export function App() {
             </QueryState>
           </Panel>
 
-          <section id="recovery" className="section-anchor">
-          <Panel title="Recovery" eyebrow="Per report">
-            <QueryState isPending={recovery.isPending} error={recovery.error}>
-              <DataTable
-                caption="Recovery metrics"
-                columns={[
-                  { key: "date", label: "Report date", render: (row) => row.report_datetime },
-                  { key: "lrf", label: "LRF BF/CM", numeric: true, render: (row) => display(row.recovery_lrf_bf_cm) },
-                  { key: "bfcf", label: "BF/CF", numeric: true, render: (row) => display(row.recovery_bf_cf) },
-                  { key: "fiber", label: "Fiber ratio", numeric: true, render: (row) => display(row.fiber_ratio) },
-                ]}
-                rows={recovery.data ?? []}
-                rowKey={(row) => String(row.file_id)}
-                emptyMessage="No recovery data was returned for these dates."
-              />
-            </QueryState>
-          </Panel>
-          </section>
-
-          <Panel title="Solution totals" eyebrow="Board count">
+          <Panel title="Solution Totals" eyebrow="Board count">
             <QueryState isPending={solutions.isPending} error={solutions.error}>
               <DataTable
-                caption="Solution totals"
+                caption="Solution Totals"
                 columns={[
                   { key: "solution", label: "Solution", numeric: true, render: (row) => row.solution_number },
                   { key: "count", label: "Boards", numeric: true, render: (row) => number.format(row.total_board_count) },
@@ -270,10 +331,10 @@ export function App() {
             </QueryState>
           </Panel>
 
-          <Panel title="Reject reasons" eyebrow="Aggregated count">
+          <Panel title="Reject Reasons" eyebrow="Aggregated count">
             <QueryState isPending={rejects.isPending} error={rejects.error}>
               <DataTable
-                caption="Reject reason totals"
+                caption="Reject Reason Totals"
                 columns={[
                   { key: "reason", label: "Reason", render: (row) => row.reason },
                   { key: "count", label: "Count", numeric: true, render: (row) => number.format(row.total_count) },
@@ -286,47 +347,65 @@ export function App() {
           </Panel>
 
           <section id="reports" className="wide-panel section-anchor">
-          <Panel title="Report files" eyebrow="Available source reports">
-            <QueryState isPending={files.isPending} error={files.error}>
-              <DataTable
-                caption="Report files"
-                columns={fileColumns}
-                rows={files.data ?? []}
-                rowKey={(row) => String(row.file_id)}
-                emptyMessage="No report files were returned for these dates."
-              />
-            </QueryState>
+          <Panel
+            title={selectedFileId === null ? "Report Files" : `File ${selectedFileId}`}
+            eyebrow={selectedFileId === null ? "Available source reports" : "Complete report"}
+            action={selectedFileId !== null ? (
+              <button className="secondary-button" type="button" onClick={() => {
+                setRawJsonOpen(false);
+                setSelectedFileId(null);
+              }}>
+                Back to reports
+              </button>
+            ) : undefined}
+          >
+            <div className={`report-panel-viewport ${selectedFileId !== null ? "show-detail" : "show-list"}`}>
+              <div className="report-panel-view report-list-view" aria-hidden={selectedFileId !== null}>
+                <QueryState isPending={files.isPending} error={files.error}>
+                  <DataTable
+                    caption="Report files"
+                    columns={fileColumns}
+                    rows={files.data ?? []}
+                    rowKey={(row) => String(row.file_id)}
+                    emptyMessage="No report files were returned for these dates."
+                  />
+                </QueryState>
+              </div>
+              <div className="report-panel-view report-detail-view" aria-hidden={selectedFileId === null}>
+                <QueryState isPending={fileDetail.isPending} error={fileDetail.error}>
+                  {fileDetail.data && (
+                    <div className="report-detail-content">
+                      <p className="detail-name">{fileDetail.data.filename}</p>
+                      <div className="detail-summary">
+                        {Object.entries(fileDetail.data.summary ?? {}).map(([key, value]) => (
+                          <div key={key}><span>{key.replaceAll("_", " ")}</span><strong>{display(value)}</strong></div>
+                        ))}
+                      </div>
+                      <div className={`raw-json-disclosure ${rawJsonOpen ? "open" : ""}`}>
+                        <button
+                          className="raw-json-toggle"
+                          type="button"
+                          aria-expanded={rawJsonOpen}
+                          aria-controls="raw-report-json"
+                          onClick={() => setRawJsonOpen((open) => !open)}
+                        >
+                          <span className="disclosure-icon" aria-hidden="true">›</span>
+                          Raw report JSON
+                        </button>
+                        <div className="raw-json-collapse" id="raw-report-json">
+                          <div>
+                            <pre>{JSON.stringify(fileDetail.data, null, 2)}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </QueryState>
+              </div>
+            </div>
           </Panel>
           </section>
         </div>
-
-        {selectedFileId !== null && (
-          <section className="detail-drawer" aria-labelledby="file-detail-heading">
-            <header>
-              <div>
-                <p className="eyebrow">Complete report</p>
-                <h2 id="file-detail-heading">File {selectedFileId}</h2>
-              </div>
-              <button className="secondary-button" type="button" onClick={() => setSelectedFileId(null)}>Close</button>
-            </header>
-            <QueryState isPending={fileDetail.isPending} error={fileDetail.error}>
-              {fileDetail.data && (
-                <>
-                  <p className="detail-name">{fileDetail.data.filename}</p>
-                  <div className="detail-summary">
-                    {Object.entries(fileDetail.data.summary ?? {}).map(([key, value]) => (
-                      <div key={key}><span>{key.replaceAll("_", " ")}</span><strong>{display(value)}</strong></div>
-                    ))}
-                  </div>
-                  <details>
-                    <summary>Raw report JSON</summary>
-                    <pre>{JSON.stringify(fileDetail.data, null, 2)}</pre>
-                  </details>
-                </>
-              )}
-            </QueryState>
-          </section>
-        )}
         </main>
       </div>
     </div>
