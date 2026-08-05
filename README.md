@@ -1,6 +1,6 @@
-# EdgerRDB Dashboard
+# Lumber Tally Dashboard
 
-A read-only local dashboard for the SFP Tally API. It displays production,
+A read-only local dashboard for the Lumber Tally API. It displays production,
 recovery, solution, reject-reason, grade-mix, and report-file data for a selected
 date or date range.
 
@@ -52,7 +52,7 @@ npm run preview
 ```
 
 Open `http://localhost:4173`. Vite preview is suitable for checking a build but
-is not the final production web-server recommendation. Native production hosting
+is not the final production web-server recommendation. Native production dhosting
 and reverse-proxy instructions will be added once the target host OS is confirmed.
 
 ## Current limitations
