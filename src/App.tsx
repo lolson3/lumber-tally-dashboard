@@ -134,13 +134,30 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <header className="hero">
-        <div>
-          <h1>Tally Dashboard</h1>
-        </div>
-      </header>
+      <aside className="sidebar">
+        <a className="brand" href="#overview" aria-label="Tally Dashboard home">
+          <span className="brand-mark" aria-hidden="true">T</span>
+          <span>Tally Dashboard</span>
+        </a>
+        <nav aria-label="Dashboard sections">
+          <a className="nav-link active" href="#overview">Overview</a>
+          <a className="nav-link" href="#production">Production</a>
+          <a className="nav-link" href="#recovery">Recovery</a>
+          <a className="nav-link" href="#reports">Reports</a>
+        </nav>
+        <p className="sidebar-note">Lumber production reporting</p>
+      </aside>
 
-      <main>
+      <div className="dashboard-surface">
+        <header className="page-header">
+          <div>
+            <p className="eyebrow">Operations</p>
+            <h1>Production overview</h1>
+          </div>
+          {isRefreshing && <span className="refresh-status" aria-live="polite">Refreshing…</span>}
+        </header>
+
+        <main id="overview">
         <section className="filter-bar" aria-labelledby="date-filter-heading">
           <div>
             <p className="eyebrow">Data window</p>
@@ -187,7 +204,8 @@ export function App() {
         </section>
 
         <div className="dashboard-grid">
-          <Panel title="Production summary" eyebrow="Report rows" className="wide-panel">
+          <section id="production" className="wide-panel section-anchor">
+          <Panel title="Production summary" eyebrow="Report rows">
             <QueryState isPending={production.isPending} error={production.error}>
               <DataTable
                 caption="Production summary"
@@ -198,6 +216,7 @@ export function App() {
               />
             </QueryState>
           </Panel>
+          </section>
 
           <Panel title="Grade mix" eyebrow="Board feet by grade">
             <QueryState isPending={gradeMix.isPending} error={gradeMix.error}>
@@ -217,6 +236,7 @@ export function App() {
             </QueryState>
           </Panel>
 
+          <section id="recovery" className="section-anchor">
           <Panel title="Recovery" eyebrow="Per report">
             <QueryState isPending={recovery.isPending} error={recovery.error}>
               <DataTable
@@ -233,6 +253,7 @@ export function App() {
               />
             </QueryState>
           </Panel>
+          </section>
 
           <Panel title="Solution totals" eyebrow="Board count">
             <QueryState isPending={solutions.isPending} error={solutions.error}>
@@ -264,7 +285,8 @@ export function App() {
             </QueryState>
           </Panel>
 
-          <Panel title="Report files" eyebrow="Available source reports" className="wide-panel">
+          <section id="reports" className="wide-panel section-anchor">
+          <Panel title="Report files" eyebrow="Available source reports">
             <QueryState isPending={files.isPending} error={files.error}>
               <DataTable
                 caption="Report files"
@@ -275,6 +297,7 @@ export function App() {
               />
             </QueryState>
           </Panel>
+          </section>
         </div>
 
         {selectedFileId !== null && (
@@ -304,12 +327,8 @@ export function App() {
             </QueryState>
           </section>
         )}
-      </main>
-
-      <footer>
-        <span>SFP Tally API v0.1.0</span>
-        <span>Read-only local dashboard</span>
-      </footer>
+        </main>
+      </div>
     </div>
   );
 }

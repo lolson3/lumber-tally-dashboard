@@ -1,8 +1,8 @@
-# EdgerRDB Dashboard Project Manifest
+# Lumber Tally Dashboard Project
 
 ## Purpose
 
-This file is the durable project record for the EdgerRDB dashboard. It captures
+This file is the durable project record for the lumber tally dashboard. It captures
 the project's goals, constraints, architecture, technical decisions, known
 unknowns, and change history so that implementation can be reviewed and resumed
 without relying on conversation history.
@@ -310,7 +310,7 @@ src/
 
 | Path | Purpose | State |
 |---|---|---|
-| `PROJECT_MANIFEST.md` | Decisions, architecture, project context, and change history | Active |
+| `PROJECT.md` | Decisions, architecture, project context, and change history | Active |
 | `Documentation/tallyapiexamples.md` | Consolidated API usage and schema reference | Active |
 | `Documentation/tallyapi.json` | Source OpenAPI 3.1 specification | Reference artifact |
 | `Documentation/Screenshot *.png` | Original API documentation screenshots | Reference artifacts |
