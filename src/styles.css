@@ -78,8 +78,15 @@ input:focus, button:focus-visible, summary:focus-visible { outline: 3px solid rg
 .metric-card span { color: var(--muted); font-size: .72rem; }
 
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding-bottom: 34px; }
-.section-anchor { min-width: 0; scroll-margin-top: 24px; }
+.section-anchor { min-width: 0; scroll-margin-top: 9px; }
+.page-header.section-anchor { scroll-margin-top: 0; }
 .section-anchor > .panel { height: 100%; }
+#reports { height: calc(100vh - 34px); min-height: 0; }
+#reports > .panel { display: flex; flex-direction: column; }
+#reports .report-panel-viewport { flex: 1; min-height: 0; }
+#reports .report-panel-view { min-height: 0; overflow: auto; }
+#reports .report-list-view { display: flex; flex-direction: column; }
+#reports .report-list-view .table-scroll { height: 100%; max-height: none; }
 .paired-panel-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .panel { border-radius: 14px; min-width: 0; overflow: hidden; }
 .chart-panel { overflow: visible; position: relative; z-index: 2; }

@@ -59,7 +59,7 @@ const plcOptions = [
   "Quad",
 ] as const;
 
-const dashboardSections = ["overview", "production", "grade-mix", "solutions-rejects", "reports"] as const;
+const dashboardSections = ["data-selection", "summary", "grade-mix", "solutions-rejects", "reports"] as const;
 
 type ProductionDisplayRow = ProductionSummaryRow & Pick<
   RecoveryRow,
@@ -72,7 +72,7 @@ export function App() {
   const [selectedPlc, setSelectedPlc] = useState<(typeof plcOptions)[number]>("Board Edger");
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<(typeof dashboardSections)[number]>("overview");
+  const [activeSection, setActiveSection] = useState<(typeof dashboardSections)[number]>("data-selection");
   const gradeChartRef = useRef<HTMLDivElement>(null);
   const solutionChartRef = useRef<HTMLDivElement>(null);
   const invalidRange = Boolean(draftRange.start && draftRange.end && draftRange.start > draftRange.end);
@@ -82,12 +82,12 @@ export function App() {
 
     const updateActiveSection = () => {
       animationFrame = 0;
-      const focusLine = window.innerHeight * 0.38;
-      let currentSection: (typeof dashboardSections)[number] = "overview";
+      let currentSection: (typeof dashboardSections)[number] = "data-selection";
 
       for (const sectionId of dashboardSections) {
         const section = document.getElementById(sectionId);
-        if (section && section.getBoundingClientRect().top <= focusLine) currentSection = sectionId;
+        const sectionBoundary = sectionId === "data-selection" ? 1 : 9;
+        if (section && section.getBoundingClientRect().top <= sectionBoundary) currentSection = sectionId;
       }
       setActiveSection(currentSection);
       const nextHash = `#${currentSection}`;
@@ -225,15 +225,15 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#overview" aria-label="Tally Dashboard home">
+        <a className="brand" href="#data-selection" aria-label="Tally Dashboard home">
           <span className="brand-mark" aria-hidden="true">
             <img src={treeLogo} alt="" />
           </span>
           <span>Tally Dashboard</span>
         </a>
         <nav aria-label="Dashboard sections">
-          <a className={`nav-link ${activeSection === "overview" ? "active" : ""}`} href="#overview">Overview</a>
-          <a className={`nav-link ${activeSection === "production" ? "active" : ""}`} href="#production">Summary</a>
+          <a className={`nav-link ${activeSection === "data-selection" ? "active" : ""}`} href="#data-selection">Data Selection</a>
+          <a className={`nav-link ${activeSection === "summary" ? "active" : ""}`} href="#summary">Summary</a>
           <a className={`nav-link ${activeSection === "grade-mix" ? "active" : ""}`} href="#grade-mix">Grade Mix</a>
           <a className={`nav-link ${activeSection === "solutions-rejects" ? "active" : ""}`} href="#solutions-rejects">Solutions &amp; Rejects</a>
           <a className={`nav-link ${activeSection === "reports" ? "active" : ""}`} href="#reports">Reports</a>
@@ -241,17 +241,17 @@ export function App() {
       </aside>
 
       <div className="dashboard-surface">
-        <header className="page-header">
+        <header id="data-selection" className="page-header section-anchor">
           <div>
-            <p className="eyebrow">Operations</p>
+            <p className="eyebrow">Sequoia Forest Products</p>
             <h1>Production Overview</h1>
           </div>
         </header>
 
         <main>
-        <section id="overview" className="filter-bar section-anchor" aria-labelledby="date-filter-heading">
+        <section className="filter-bar" aria-labelledby="date-filter-heading">
           <div>
-            <p className="eyebrow">Data window</p>
+            <p className="eyebrow">Data selection</p>
             <h2 id="date-filter-heading">Choose Report Dates</h2>
           </div>
           <form onSubmit={applyRange}>
@@ -314,7 +314,7 @@ export function App() {
         </section>
 
         <div className="dashboard-grid">
-          <section id="production" className="wide-panel section-anchor">
+          <section id="summary" className="wide-panel section-anchor">
           <Panel title="Production Summary" eyebrow="Report rows">
             <QueryState
               isPending={production.isPending || recovery.isPending}
