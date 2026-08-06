@@ -534,7 +534,7 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span>Log Tally Dashboard</span>
+          <span>Lumber Tally Dashboard</span>
         </div>
         <nav aria-label="Dashboard sections">
           <a className={`nav-link ${activeSection === "data-selection" ? "active" : ""}`} href="#data-selection" onClick={() => selectNavigationSection("data-selection")}>Data Selection</a>
