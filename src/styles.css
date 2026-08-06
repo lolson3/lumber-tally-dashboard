@@ -72,11 +72,11 @@ input:focus, button:focus-visible, summary:focus-visible { outline: 3px solid rg
 .validation-message { grid-column: 2; margin: 0; color: var(--danger); font-size: .82rem; }
 
 .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
-.metric-card { background: #fcf6f1; border-radius: 12px; min-width: 0; padding: 18px 20px; min-height: 120px; overflow: hidden; }
-.metric-card:nth-child(2) { background: #faeee5; }
-.metric-card:nth-child(3) { background: #f8e5d8; }
-.metric-card:nth-child(4) { background: #f6dccb; }
-.metric-card:nth-child(5) { background: #f4d4bc; }
+.metric-card { background: #fff0e3; border-radius: 12px; min-width: 0; padding: 18px 20px; min-height: 120px; overflow: hidden; }
+.metric-card:nth-child(2) { background: #fee4d1; }
+.metric-card:nth-child(3) { background: #fdd7be; }
+.metric-card:nth-child(4) { background: #fac9a9; }
+.metric-card:nth-child(5) { background: #f6b991; }
 .metric-card p { color: var(--muted); font-size: .78rem; font-weight: 600; margin: 0 0 15px; }
 .metric-card strong { display: block; font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif; font-size: clamp(1.05rem, 2vw, 2.05rem); letter-spacing: -.05em; line-height: 1.08; max-width: 100%; overflow-wrap: anywhere; }
 .metric-card span { color: var(--muted); font-size: .72rem; }
