@@ -3,6 +3,7 @@ import type {
   FileDetail,
   FileOut,
   GradeMixRow,
+  GradeMixGrouping,
   HealthResponse,
   ProductionSummaryRow,
   RecoveryRow,
@@ -118,9 +119,15 @@ export const tallyApi = {
       signal,
     ),
 
-  gradeMix: (range: DateRange, signal?: AbortSignal) =>
+  gradeMix: (range: DateRange, groupBy: GradeMixGrouping, signal?: AbortSignal) =>
     request<GradeMixRow[]>(
-      `/grade-mix?${paramsFor(range, { group_by: "grade" })}`,
+      `/grade-mix?${paramsFor(range, { group_by: groupBy })}`,
+      signal,
+    ),
+
+  boardDimensionMix: (range: DateRange, signal?: AbortSignal) =>
+    request<GradeMixRow[]>(
+      `/grade-mix?${paramsFor(range, { group_by: "width,length_ft,thickness,grade" })}`,
       signal,
     ),
 };

@@ -11,11 +11,10 @@ import {
   YAxis,
 } from "recharts";
 import { tallyApi } from "./api/client";
-import type { DateRange, FileOut, ProductionSummaryRow, RecoveryRow } from "./api/types";
+import type { DateRange, FileOut, GradeMixGrouping, ProductionSummaryRow, RecoveryRow } from "./api/types";
 import { DataTable, type Column } from "./components/DataTable";
 import { Panel } from "./components/Panel";
 import { QueryState } from "./components/QueryState";
-import treeLogo from "./img/tree.svg";
 
 const number = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const money = new Intl.NumberFormat("en-US", {
@@ -38,12 +37,26 @@ function sum(values: Array<number | null | undefined>) {
   return values.reduce<number>((total, value) => total + (value ?? 0), 0);
 }
 
-function followChartTooltip(chart: HTMLDivElement | null, clientX: number, clientY: number) {
-  const tooltip = chart?.querySelector<HTMLElement>(".recharts-tooltip-wrapper");
-  if (!chart || !tooltip) return;
+function positionTooltipAtCursor(
+  tooltip: HTMLElement | null,
+  clientX: number,
+  clientY: number,
+  origin = { left: 0, top: 0 },
+) {
+  if (!tooltip) return;
+  tooltip.style.transform = `translate(${clientX - origin.left + 14}px, ${clientY - origin.top + 14}px)`;
+}
 
-  const bounds = chart.getBoundingClientRect();
-  tooltip.style.transform = `translate(${clientX - bounds.left + 14}px, ${clientY - bounds.top + 14}px)`;
+function followChartTooltip(chart: HTMLDivElement | null, clientX: number, clientY: number) {
+  if (!chart) return;
+  const tooltip = chart.querySelector<HTMLElement>(".recharts-tooltip-wrapper");
+  positionTooltipAtCursor(tooltip, clientX, clientY, chart.getBoundingClientRect());
+  tooltip?.style.setProperty("opacity", "1", "important");
+}
+
+function hideChartTooltip(chart: HTMLDivElement | null) {
+  chart?.querySelector<HTMLElement>(".recharts-tooltip-wrapper")
+    ?.style.setProperty("opacity", "0", "important");
 }
 
 const plcOptions = [
@@ -60,7 +73,7 @@ const plcOptions = [
   "Quad",
 ] as const;
 
-const dashboardSections = ["data-selection", "summary", "grade-mix", "solutions-rejects", "reports"] as const;
+const dashboardSections = ["data-selection", "summary", "mix-graphs", "solutions-rejects", "reports"] as const;
 type DashboardSection = (typeof dashboardSections)[number];
 
 type ProductionDisplayRow = ProductionSummaryRow & Pick<
@@ -68,21 +81,40 @@ type ProductionDisplayRow = ProductionSummaryRow & Pick<
   "recovery_lrf_bf_cm" | "recovery_bf_cf" | "fiber_ratio"
 >;
 
+interface BoardShape {
+  width: number;
+  lengthFt: number;
+  breakdown: Array<{ thickness: string; grade: string; pieces: number; boardFeet: number }>;
+}
+
+const gradeMixLabels: Record<GradeMixGrouping, string> = {
+  grade: "Grade",
+  thickness: "Thickness",
+  width: "Width",
+  length_ft: "Length Ft",
+};
+
 export function App() {
   const [draftRange, setDraftRange] = useState<DateRange>(todayRange);
   const [range, setRange] = useState<DateRange>(todayRange);
   const [selectedPlc, setSelectedPlc] = useState<(typeof plcOptions)[number]>("Board Edger");
+  const [gradeMixGrouping, setGradeMixGrouping] = useState<GradeMixGrouping>("grade");
+  const [productionView, setProductionView] = useState<"table" | "visual">("table");
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
   const [hiddenProductionColumns, setHiddenProductionColumns] = useState<Set<string>>(() => new Set());
   const [columnFilterOpen, setColumnFilterOpen] = useState(false);
   const [columnFilterPosition, setColumnFilterPosition] = useState({ top: 0, right: 0 });
+  const [trunkBlockCount, setTrunkBlockCount] = useState(0);
+  const [activeBoardShape, setActiveBoardShape] = useState<BoardShape | null>(null);
+  const [boardTooltipPosition, setBoardTooltipPosition] = useState({ x: 0, y: 0 });
   const [activeSection, setActiveSection] = useState<DashboardSection | null>("data-selection");
   const gradeChartRef = useRef<HTMLDivElement>(null);
   const solutionChartRef = useRef<HTMLDivElement>(null);
-  const navigationTargetRef = useRef<DashboardSection | null>(null);
   const columnFilterRef = useRef<HTMLDivElement>(null);
   const columnFilterMenuRef = useRef<HTMLDivElement>(null);
+  const trunkFieldRef = useRef<HTMLDivElement>(null);
+  const boardTooltipRef = useRef<HTMLDivElement>(null);
   const invalidRange = Boolean(draftRange.start && draftRange.end && draftRange.start > draftRange.end);
 
   useEffect(() => {
@@ -107,17 +139,6 @@ export function App() {
         if (previousBounds.bottom <= 1) currentSection = sectionBounds[index].id;
       }
 
-      const navigationTarget = navigationTargetRef.current;
-      if (navigationTarget) {
-        currentSection = navigationTarget;
-        const target = document.getElementById(navigationTarget);
-        if (target) {
-          const targetOffset = Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
-          if (Math.abs(target.getBoundingClientRect().top - targetOffset) <= 2) {
-            navigationTargetRef.current = null;
-          }
-        }
-      }
       setActiveSection(currentSection);
       if (currentSection) {
         const nextHash = `#${currentSection}`;
@@ -163,6 +184,22 @@ export function App() {
   }, [columnFilterOpen]);
 
   useEffect(() => {
+    const trunkField = trunkFieldRef.current;
+    if (!trunkField) return;
+
+    const blockHeight = 28;
+    const blockGap = 3;
+    const updateBlockCount = () => {
+      const availableHeight = trunkField.getBoundingClientRect().height;
+      setTrunkBlockCount(Math.max(0, Math.floor((availableHeight + blockGap) / (blockHeight + blockGap))));
+    };
+    const observer = new ResizeObserver(updateBlockCount);
+    observer.observe(trunkField);
+    updateBlockCount();
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (!columnFilterOpen) return;
 
     const positionMenu = () => {
@@ -205,8 +242,13 @@ export function App() {
     queryFn: ({ signal }) => tallyApi.rejectReasonTotals(range, signal),
   });
   const gradeMix = useQuery({
-    queryKey: ["grade-mix", selectedPlc, range],
-    queryFn: ({ signal }) => tallyApi.gradeMix(range, signal),
+    queryKey: ["grade-mix", selectedPlc, gradeMixGrouping, range],
+    queryFn: ({ signal }) => tallyApi.gradeMix(range, gradeMixGrouping, signal),
+  });
+  const boardDimensionMix = useQuery({
+    queryKey: ["board-dimension-mix", selectedPlc, range],
+    queryFn: ({ signal }) => tallyApi.boardDimensionMix(range, signal),
+    enabled: productionView === "visual",
   });
   const fileDetail = useQuery({
     queryKey: ["file-detail", selectedFileId],
@@ -237,6 +279,28 @@ export function App() {
       };
     });
   }, [production.data, recovery.data]);
+
+  const boardShapes = useMemo(() => {
+    const shapes = new Map<string, BoardShape>();
+
+    for (const row of boardDimensionMix.data ?? []) {
+      if (row.width == null || row.length_ft == null) continue;
+      const key = `${row.width}-${row.length_ft}`;
+      const shape = shapes.get(key) ?? { width: row.width, lengthFt: row.length_ft, breakdown: [] };
+      shape.breakdown.push({
+        thickness: row.thickness ?? "Unknown",
+        grade: row.grade ?? "Unknown",
+        pieces: row.total_pieces,
+        boardFeet: row.total_bd_ft,
+      });
+      shapes.set(key, shape);
+    }
+
+    return [...shapes.values()].sort((a, b) => a.width - b.width || a.lengthFt - b.lengthFt);
+  }, [boardDimensionMix.data]);
+
+  const maximumBoardWidth = Math.max(1, ...boardShapes.map((shape) => shape.width));
+  const maximumBoardLength = Math.max(1, ...boardShapes.map((shape) => shape.lengthFt));
 
   const productionColumns: Array<Column<ProductionDisplayRow>> = [
     { key: "date", label: "Report date", render: (row) => row.report_datetime },
@@ -313,31 +377,54 @@ export function App() {
   }
 
   function selectNavigationSection(section: DashboardSection) {
-    navigationTargetRef.current = section;
     setActiveSection(section);
   }
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#data-selection" aria-label="Tally Dashboard home">
+        <div className="brand">
           <span>Log Tally Dashboard</span>
-        </a>
+        </div>
         <nav aria-label="Dashboard sections">
           <a className={`nav-link ${activeSection === "data-selection" ? "active" : ""}`} href="#data-selection" onClick={() => selectNavigationSection("data-selection")}>Data Selection</a>
           <a className={`nav-link ${activeSection === "summary" ? "active" : ""}`} href="#summary" onClick={() => selectNavigationSection("summary")}>Summary</a>
-          <a className={`nav-link ${activeSection === "grade-mix" ? "active" : ""}`} href="#grade-mix" onClick={() => selectNavigationSection("grade-mix")}>Grade Mix</a>
+          <a className={`nav-link ${activeSection === "mix-graphs" ? "active" : ""}`} href="#mix-graphs" onClick={() => selectNavigationSection("mix-graphs")}>Mix Graphs</a>
           <a className={`nav-link ${activeSection === "solutions-rejects" ? "active" : ""}`} href="#solutions-rejects" onClick={() => selectNavigationSection("solutions-rejects")}>Solutions &amp; Rejects</a>
           <a className={`nav-link ${activeSection === "reports" ? "active" : ""}`} href="#reports" onClick={() => selectNavigationSection("reports")}>Reports</a>
         </nav>
-        <img className="sidebar-tree" src={treeLogo} alt="" aria-hidden="true" />
+        <div className="sidebar-trunk-field" ref={trunkFieldRef} aria-hidden="true">
+          <div className="sidebar-trunk">
+            {Array.from({ length: trunkBlockCount }, (_, index) => {
+              const levelFromTop = trunkBlockCount - index - 1;
+              const hasBranches = levelFromTop < Math.min(9, trunkBlockCount);
+              const branchWidth = 9 + levelFromTop * 5;
+              return (
+                <span className="trunk-block" key={index} style={{ animationDelay: `${index * 35}ms` }}>
+                  {hasBranches && (
+                    <>
+                      <span
+                        className="trunk-branch trunk-branch-left"
+                        style={{ width: `${branchWidth + (levelFromTop % 2 === 0 ? 4 : 0)}px` }}
+                      />
+                      <span
+                        className="trunk-branch trunk-branch-right"
+                        style={{ width: `${branchWidth + (levelFromTop % 2 === 1 ? 5 : 0)}px` }}
+                      />
+                    </>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        </div>
       </aside>
 
       <div className="dashboard-surface">
         <header id="data-selection" className="page-header section-anchor">
           <div>
-            <p className="eyebrow">Sequoia Forest Products</p>
-            <h1>Production Overview</h1>
+            <p className="eyebrow typewriter-heading">Sequoia Forest Products</p>
+            <h1>PLC Overview</h1>
           </div>
         </header>
 
@@ -415,6 +502,18 @@ export function App() {
             eyebrow="Report rows"
             action={(
               <>
+              <div className="summary-actions">
+              <button
+                className={`summary-view-toggle ${productionView === "visual" ? "show-visual" : "show-table"}`}
+                type="button"
+                aria-pressed={productionView === "visual"}
+                aria-label={`Switch to ${productionView === "table" ? "visual" : "table"} view`}
+                onClick={() => setProductionView((view) => view === "table" ? "visual" : "table")}
+              >
+                <span className={productionView === "table" ? "selected" : ""}>Table</span>
+                <span className={productionView === "visual" ? "selected" : ""}>Visual</span>
+                <span className="summary-view-toggle-thumb" aria-hidden="true" />
+              </button>
               <div className="column-filter" ref={columnFilterRef}>
                 <button
                   className="column-filter-button"
@@ -425,6 +524,7 @@ export function App() {
                 >
                   Filter
                 </button>
+              </div>
               </div>
                 {columnFilterOpen && createPortal(
                   <div
@@ -453,35 +553,91 @@ export function App() {
               </>
             )}
           >
-            <QueryState
-              isPending={production.isPending || recovery.isPending}
-              error={production.error ?? recovery.error}
-              onRetry={() => { void production.refetch(); void recovery.refetch(); }}
-            >
-              <DataTable
-                caption="Production Summary"
-                columns={visibleProductionColumns}
-                rows={productionRows}
-                rowKey={(row) => String(row.file_id)}
-                emptyMessage="No production rows were returned for these dates."
-              />
-            </QueryState>
+            {productionView === "table" ? (
+              <QueryState
+                isPending={production.isPending || recovery.isPending}
+                error={production.error ?? recovery.error}
+                onRetry={() => { void production.refetch(); void recovery.refetch(); }}
+              >
+                <DataTable
+                  caption="Production Summary"
+                  columns={visibleProductionColumns}
+                  rows={productionRows}
+                  rowKey={(row) => String(row.file_id)}
+                  emptyMessage="No production rows were returned for these dates."
+                />
+              </QueryState>
+            ) : (
+              <QueryState
+                isPending={boardDimensionMix.isPending}
+                error={boardDimensionMix.error}
+                onRetry={() => { void boardDimensionMix.refetch(); }}
+              >
+                {boardShapes.length > 0 ? (
+                  <div className="board-visualization" aria-label="Relative board dimensions by width and length">
+                    {boardShapes.map((shape) => (
+                      <div
+                        className="board-shape"
+                        key={`${shape.width}-${shape.lengthFt}`}
+                        tabIndex={0}
+                        onPointerEnter={(event) => {
+                          setBoardTooltipPosition({ x: event.clientX + 14, y: event.clientY + 14 });
+                          setActiveBoardShape(shape);
+                        }}
+                        onPointerMove={(event) => positionTooltipAtCursor(boardTooltipRef.current, event.clientX, event.clientY)}
+                        onPointerLeave={() => setActiveBoardShape(null)}
+                        onFocus={(event) => {
+                          const bounds = event.currentTarget.getBoundingClientRect();
+                          setBoardTooltipPosition({ x: bounds.right + 14, y: bounds.top + 14 });
+                          setActiveBoardShape(shape);
+                        }}
+                        onBlur={() => setActiveBoardShape(null)}
+                        style={{
+                          width: `${44 + (shape.width / maximumBoardWidth) * 76}px`,
+                          height: `${64 + (shape.lengthFt / maximumBoardLength) * 126}px`,
+                        }}
+                      >
+                        <span>{number.format(shape.width)} × {number.format(shape.lengthFt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="empty-state">No board dimension data was returned for these dates.</p>}
+              </QueryState>
+            )}
           </Panel>
           </section>
 
-          <section id="grade-mix" className="wide-panel section-anchor">
-          <Panel title="Grade Mix" eyebrow="Board feet by grade" className="chart-panel">
+          <section id="mix-graphs" className="wide-panel section-anchor">
+          <Panel
+            title={(
+              <>
+                <select
+                  className="grade-group-select"
+                  aria-label="Group grade mix by"
+                  value={gradeMixGrouping}
+                  onChange={(event) => setGradeMixGrouping(event.target.value as GradeMixGrouping)}
+                >
+                  {(Object.entries(gradeMixLabels) as Array<[GradeMixGrouping, string]>).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>{" "}Mix
+              </>
+            )}
+            eyebrow={`Board feet by ${gradeMixLabels[gradeMixGrouping].toLowerCase()}`}
+            className="chart-panel"
+          >
             <QueryState isPending={gradeMix.isPending} error={gradeMix.error} onRetry={() => { void gradeMix.refetch(); }}>
               {(gradeMix.data?.length ?? 0) > 0 ? (
-                <div className="chart-wrap" aria-label="Grade mix bar chart" ref={gradeChartRef}>
+                <div className="chart-wrap" aria-label={`Board feet by ${gradeMixLabels[gradeMixGrouping]} bar chart`} ref={gradeChartRef}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={gradeMix.data}
                       margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
                       onMouseMove={(_, event) => followChartTooltip(gradeChartRef.current, event.clientX, event.clientY)}
+                      onMouseLeave={() => hideChartTooltip(gradeChartRef.current)}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="grade" tickLine={false} />
+                      <XAxis dataKey={gradeMixGrouping} tickLine={false} />
                       <YAxis tickLine={false} width={72} />
                       <Tooltip
                         position={{ x: 0, y: 0 }}
@@ -508,6 +664,7 @@ export function App() {
                       data={solutions.data}
                       margin={{ top: 8, right: 8, left: 8, bottom: -10 }}
                       onMouseMove={(_, event) => followChartTooltip(solutionChartRef.current, event.clientX, event.clientY)}
+                      onMouseLeave={() => hideChartTooltip(solutionChartRef.current)}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
@@ -616,6 +773,23 @@ export function App() {
           </section>
         </div>
         </main>
+        {activeBoardShape && createPortal(
+          <div
+            className="board-shape-tooltip board-shape-tooltip-portal"
+            ref={boardTooltipRef}
+            role="tooltip"
+            style={{ transform: `translate(${boardTooltipPosition.x}px, ${boardTooltipPosition.y}px)` }}
+          >
+            <strong>{number.format(activeBoardShape.width)} in × {number.format(activeBoardShape.lengthFt)} ft</strong>
+            {activeBoardShape.breakdown.map((item) => (
+              <div key={`${item.thickness}-${item.grade}`}>
+                <span>{item.thickness} in · Grade {item.grade.replace(/^#/, "")}</span>
+                <span>{number.format(item.pieces)} pieces · {number.format(item.boardFeet)} bd ft</span>
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
       </div>
     </div>
   );

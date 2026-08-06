@@ -58,6 +58,8 @@ export interface GradeMixRow {
   total_bd_ft: number;
 }
 
+export type GradeMixGrouping = "thickness" | "width" | "grade" | "length_ft";
+
 export interface SummaryOut {
   time_start?: string | null;
   time_run?: string | null;
