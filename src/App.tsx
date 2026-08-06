@@ -126,6 +126,8 @@ export function App() {
   const treeFieldRef = useRef<HTMLDivElement>(null);
   const treeCanvasRef = useRef<HTMLCanvasElement>(null);
   const boardTooltipRef = useRef<HTMLDivElement>(null);
+  const navigationTargetRef = useRef<DashboardSection | null>(null);
+  const navigationUnlockTimerRef = useRef<number | null>(null);
   const invalidRange = Boolean(draftRange.start && draftRange.end && draftRange.start > draftRange.end);
 
   useEffect(() => {
@@ -133,6 +135,14 @@ export function App() {
 
     const updateActiveSection = () => {
       animationFrame = 0;
+      const navigationTarget = navigationTargetRef.current;
+      if (navigationTarget) {
+        setActiveSection(navigationTarget);
+        const nextHash = `#${navigationTarget}`;
+        if (window.location.hash !== nextHash) window.history.replaceState(window.history.state, "", nextHash);
+        return;
+      }
+
       const sectionBounds = dashboardSections.map((sectionId) => {
         const section = document.getElementById(sectionId);
         if (!section) return null;
@@ -163,13 +173,30 @@ export function App() {
       if (!animationFrame) animationFrame = window.requestAnimationFrame(updateActiveSection);
     };
 
+    const releaseNavigationLock = () => {
+      if (!navigationTargetRef.current) return;
+      navigationTargetRef.current = null;
+      if (navigationUnlockTimerRef.current !== null) {
+        window.clearTimeout(navigationUnlockTimerRef.current);
+        navigationUnlockTimerRef.current = null;
+      }
+      scheduleUpdate();
+    };
+
     updateActiveSection();
     window.addEventListener("scroll", scheduleUpdate, { passive: true });
     window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("scrollend", releaseNavigationLock);
+    window.addEventListener("wheel", releaseNavigationLock, { passive: true });
+    window.addEventListener("touchstart", releaseNavigationLock, { passive: true });
     return () => {
       window.cancelAnimationFrame(animationFrame);
       window.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("scrollend", releaseNavigationLock);
+      window.removeEventListener("wheel", releaseNavigationLock);
+      window.removeEventListener("touchstart", releaseNavigationLock);
+      if (navigationUnlockTimerRef.current !== null) window.clearTimeout(navigationUnlockTimerRef.current);
     };
   }, []);
 
@@ -444,6 +471,19 @@ export function App() {
     }
   }
 
+  function toggleColumnFilterMenu() {
+    if (columnFilterOpen) {
+      setColumnFilterOpen(false);
+      return;
+    }
+
+    const bounds = columnFilterRef.current?.getBoundingClientRect();
+    if (bounds) {
+      setColumnFilterPosition({ top: bounds.bottom + 7, right: window.innerWidth - bounds.right });
+    }
+    setColumnFilterOpen(true);
+  }
+
   const fileColumns: Array<Column<FileOut>> = [
     { key: "id", label: "ID", numeric: true, render: (row) => row.file_id },
     { key: "filename", label: "Filename", render: (row) => row.filename },
@@ -480,6 +520,13 @@ export function App() {
   }
 
   function selectNavigationSection(section: DashboardSection) {
+    navigationTargetRef.current = section;
+    if (navigationUnlockTimerRef.current !== null) window.clearTimeout(navigationUnlockTimerRef.current);
+    navigationUnlockTimerRef.current = window.setTimeout(() => {
+      navigationTargetRef.current = null;
+      navigationUnlockTimerRef.current = null;
+      window.dispatchEvent(new Event("scroll"));
+    }, 1_200);
     setActiveSection(section);
   }
 
@@ -601,7 +648,7 @@ export function App() {
                   type="button"
                   aria-expanded={columnFilterOpen}
                   aria-controls="production-column-filter"
-                  onClick={() => setColumnFilterOpen((open) => !open)}
+                  onClick={toggleColumnFilterMenu}
                 >
                   Filter
                 </button>
