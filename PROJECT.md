@@ -338,6 +338,15 @@ src/
 
 ## Change log
 
+### 2026-08-06
+
+- Routed browser data requests through a same-origin `/api` proxy in Vite development
+  and preview, using `VITE_TALLY_API_BASE_URL` only as the upstream proxy target.
+- Added error-aware exponential retries for transient network and server failures,
+  clearer network and invalid-response errors, and per-panel manual retry actions.
+- Kept client and validation errors non-retriable and prevented aborted requests from
+  being retried.
+
 ### 2026-07-31
 
 - Created this project manifest before dashboard development.

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -37,6 +37,14 @@ function sum(values: Array<number | null | undefined>) {
   return values.reduce<number>((total, value) => total + (value ?? 0), 0);
 }
 
+function followChartTooltip(chart: HTMLDivElement | null, clientX: number, clientY: number) {
+  const tooltip = chart?.querySelector<HTMLElement>(".recharts-tooltip-wrapper");
+  if (!chart || !tooltip) return;
+
+  const bounds = chart.getBoundingClientRect();
+  tooltip.style.transform = `translate(${clientX - bounds.left + 14}px, ${clientY - bounds.top + 14}px)`;
+}
+
 const plcOptions = [
   "Board Edger",
   "Chopsaw",
@@ -51,6 +59,8 @@ const plcOptions = [
   "Quad",
 ] as const;
 
+const dashboardSections = ["overview", "production", "grade-mix", "solutions-rejects", "reports"] as const;
+
 type ProductionDisplayRow = ProductionSummaryRow & Pick<
   RecoveryRow,
   "recovery_lrf_bf_cm" | "recovery_bf_cf" | "fiber_ratio"
@@ -62,8 +72,43 @@ export function App() {
   const [selectedPlc, setSelectedPlc] = useState<(typeof plcOptions)[number]>("Board Edger");
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<(typeof dashboardSections)[number]>("overview");
   const gradeChartRef = useRef<HTMLDivElement>(null);
+  const solutionChartRef = useRef<HTMLDivElement>(null);
   const invalidRange = Boolean(draftRange.start && draftRange.end && draftRange.start > draftRange.end);
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateActiveSection = () => {
+      animationFrame = 0;
+      const focusLine = window.innerHeight * 0.38;
+      let currentSection: (typeof dashboardSections)[number] = "overview";
+
+      for (const sectionId of dashboardSections) {
+        const section = document.getElementById(sectionId);
+        if (section && section.getBoundingClientRect().top <= focusLine) currentSection = sectionId;
+      }
+      setActiveSection(currentSection);
+      const nextHash = `#${currentSection}`;
+      if (window.location.hash !== nextHash) {
+        window.history.replaceState(window.history.state, "", nextHash);
+      }
+    };
+
+    const scheduleUpdate = () => {
+      if (!animationFrame) animationFrame = window.requestAnimationFrame(updateActiveSection);
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+  }, []);
 
   useQuery({
     queryKey: ["health"],
@@ -187,9 +232,11 @@ export function App() {
           <span>Tally Dashboard</span>
         </a>
         <nav aria-label="Dashboard sections">
-          <a className="nav-link active" href="#overview">Overview</a>
-          <a className="nav-link" href="#production">Production</a>
-          <a className="nav-link" href="#reports">Reports</a>
+          <a className={`nav-link ${activeSection === "overview" ? "active" : ""}`} href="#overview">Overview</a>
+          <a className={`nav-link ${activeSection === "production" ? "active" : ""}`} href="#production">Summary</a>
+          <a className={`nav-link ${activeSection === "grade-mix" ? "active" : ""}`} href="#grade-mix">Grade Mix</a>
+          <a className={`nav-link ${activeSection === "solutions-rejects" ? "active" : ""}`} href="#solutions-rejects">Solutions &amp; Rejects</a>
+          <a className={`nav-link ${activeSection === "reports" ? "active" : ""}`} href="#reports">Reports</a>
         </nav>
       </aside>
 
@@ -199,36 +246,37 @@ export function App() {
             <p className="eyebrow">Operations</p>
             <h1>Production Overview</h1>
           </div>
-          <div className="plc-control">
-            <select
-              id="plc-select"
-              value={selectedPlc}
-              onChange={(event) => {
-                setSelectedPlc(event.target.value as (typeof plcOptions)[number]);
-                setSelectedFileId(null);
-              }}
-            >
-              {plcOptions.map((plc) => (
-                <option key={plc} value={plc} disabled={plc !== "Board Edger"}>
-                  {plc}
-                </option>
-              ))}
-            </select>
-            {isRefreshing && <span className="refresh-status" aria-live="polite">Refreshing…</span>}
-          </div>
         </header>
 
-        <main id="overview">
-        <section className="filter-bar" aria-labelledby="date-filter-heading">
+        <main>
+        <section id="overview" className="filter-bar section-anchor" aria-labelledby="date-filter-heading">
           <div>
             <p className="eyebrow">Data window</p>
-            <h2 id="date-filter-heading">Choose report dates</h2>
+            <h2 id="date-filter-heading">Choose Report Dates</h2>
           </div>
           <form onSubmit={applyRange}>
+            <label className="plc-control" htmlFor="plc-select">
+              PLC
+              <select
+                className="window-input"
+                id="plc-select"
+                value={selectedPlc}
+                onChange={(event) => {
+                  setSelectedPlc(event.target.value as (typeof plcOptions)[number]);
+                  setSelectedFileId(null);
+                }}
+              >
+                {plcOptions.map((plc) => (
+                  <option key={plc} value={plc} disabled={plc !== "Board Edger"}>
+                    {plc}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               Start date
               <input
-                className="calendar-input"
+                className="window-input"
                 type="date"
                 value={draftRange.start}
                 max={draftRange.end || undefined}
@@ -238,15 +286,15 @@ export function App() {
             <label>
               End date
               <input
-                className="calendar-input"
+                className="window-input"
                 type="date"
                 value={draftRange.end}
                 min={draftRange.start || undefined}
                 onChange={(event) => setDraftRange((current) => ({ ...current, end: event.target.value }))}
               />
             </label>
-            <button className="primary-button" type="submit" disabled={invalidRange}>Apply dates</button>
-            <button className="secondary-button" type="button" onClick={showAllDates}>All dates</button>
+            <button className="primary-button" type="submit" disabled={invalidRange}>Apply Dates</button>
+            <button className="secondary-button" type="button" onClick={showAllDates}>All Dates</button>
           </form>
           {invalidRange && <p className="validation-message" role="alert">Start date must be on or before end date.</p>}
           <p className="filter-note">
@@ -268,7 +316,11 @@ export function App() {
         <div className="dashboard-grid">
           <section id="production" className="wide-panel section-anchor">
           <Panel title="Production Summary" eyebrow="Report rows">
-            <QueryState isPending={production.isPending} error={production.error}>
+            <QueryState
+              isPending={production.isPending || recovery.isPending}
+              error={production.error ?? recovery.error}
+              onRetry={() => { void production.refetch(); void recovery.refetch(); }}
+            >
               <DataTable
                 caption="Production Summary"
                 columns={productionColumns}
@@ -280,59 +332,74 @@ export function App() {
           </Panel>
           </section>
 
-          <Panel title="Grade Mix" eyebrow="Board feet by grade" className="grade-mix-panel wide-panel">
-            <QueryState isPending={gradeMix.isPending} error={gradeMix.error}>
+          <section id="grade-mix" className="wide-panel section-anchor">
+          <Panel title="Grade Mix" eyebrow="Board feet by grade" className="chart-panel">
+            <QueryState isPending={gradeMix.isPending} error={gradeMix.error} onRetry={() => { void gradeMix.refetch(); }}>
               {(gradeMix.data?.length ?? 0) > 0 ? (
                 <div className="chart-wrap" aria-label="Grade mix bar chart" ref={gradeChartRef}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={gradeMix.data}
                       margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
-                      onMouseMove={(_, event) => {
-                        const chart = gradeChartRef.current;
-                        const tooltip = chart?.querySelector<HTMLElement>(".recharts-tooltip-wrapper");
-                        if (!chart || !tooltip) return;
-
-                        const bounds = chart.getBoundingClientRect();
-                        const x = event.clientX - bounds.left + 14;
-                        const y = event.clientY - bounds.top + 14;
-                        tooltip.style.transform = `translate(${x}px, ${y}px)`;
-                      }}
+                      onMouseMove={(_, event) => followChartTooltip(gradeChartRef.current, event.clientX, event.clientY)}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis dataKey="grade" tickLine={false} />
-                      <YAxis tickLine={false} width={54} />
+                      <YAxis tickLine={false} width={72} />
                       <Tooltip
                         position={{ x: 0, y: 0 }}
                         isAnimationActive={false}
                         cursor={false}
                         formatter={(value) => [number.format(Number(value)), "Board feet"]}
                       />
-                      <Bar dataKey="total_bd_ft" fill="#d9963b" radius={[5, 5, 0, 0]} />
+                      <Bar dataKey="total_bd_ft" fill="#f5a623" radius={[5, 5, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               ) : <p className="empty-state">No grade-mix data was returned for these dates.</p>}
             </QueryState>
           </Panel>
+          </section>
 
-          <Panel title="Solution Totals" eyebrow="Board count">
-            <QueryState isPending={solutions.isPending} error={solutions.error}>
-              <DataTable
-                caption="Solution Totals"
-                columns={[
-                  { key: "solution", label: "Solution", numeric: true, render: (row) => row.solution_number },
-                  { key: "count", label: "Boards", numeric: true, render: (row) => number.format(row.total_board_count) },
-                ]}
-                rows={solutions.data ?? []}
-                rowKey={(row) => String(row.solution_number)}
-                emptyMessage="No solution totals were returned for these dates."
-              />
+          <section id="solutions-rejects" className="wide-panel paired-panel-row section-anchor">
+          <Panel title="Solution Totals" eyebrow="Board Count by Solution " className="chart-panel solution-chart-panel">
+            <QueryState isPending={solutions.isPending} error={solutions.error} onRetry={() => { void solutions.refetch(); }}>
+              {(solutions.data?.length ?? 0) > 0 ? (
+                <div className="chart-wrap" aria-label="Board count by solution number bar chart" ref={solutionChartRef}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={solutions.data}
+                      margin={{ top: 8, right: 8, left: 8, bottom: -10 }}
+                      onMouseMove={(_, event) => followChartTooltip(solutionChartRef.current, event.clientX, event.clientY)}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="solution_number"
+                        tickLine={false}
+                        label={{ position: "insideBottom", offset: -14 }}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        width={72}
+                        label={{ angle: -90, position: "insideLeft" }}
+                      />
+                      <Tooltip
+                        position={{ x: 0, y: 0 }}
+                        isAnimationActive={false}
+                        cursor={false}
+                        formatter={(value) => [number.format(Number(value)), "Board count"]}
+                        labelFormatter={(label) => `Solution ${label}`}
+                      />
+                      <Bar dataKey="total_board_count" fill="#468f60" radius={[5, 5, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : <p className="empty-state">No solution totals were returned for these dates.</p>}
             </QueryState>
           </Panel>
 
           <Panel title="Reject Reasons" eyebrow="Aggregated count">
-            <QueryState isPending={rejects.isPending} error={rejects.error}>
+            <QueryState isPending={rejects.isPending} error={rejects.error} onRetry={() => { void rejects.refetch(); }}>
               <DataTable
                 caption="Reject Reason Totals"
                 columns={[
@@ -345,6 +412,7 @@ export function App() {
               />
             </QueryState>
           </Panel>
+          </section>
 
           <section id="reports" className="wide-panel section-anchor">
           <Panel
@@ -361,7 +429,7 @@ export function App() {
           >
             <div className={`report-panel-viewport ${selectedFileId !== null ? "show-detail" : "show-list"}`}>
               <div className="report-panel-view report-list-view" aria-hidden={selectedFileId !== null}>
-                <QueryState isPending={files.isPending} error={files.error}>
+                <QueryState isPending={files.isPending} error={files.error} onRetry={() => { void files.refetch(); }}>
                   <DataTable
                     caption="Report files"
                     columns={fileColumns}
@@ -372,7 +440,11 @@ export function App() {
                 </QueryState>
               </div>
               <div className="report-panel-view report-detail-view" aria-hidden={selectedFileId === null}>
-                <QueryState isPending={fileDetail.isPending} error={fileDetail.error}>
+                <QueryState
+                  isPending={fileDetail.isPending}
+                  error={fileDetail.error}
+                  onRetry={() => { void fileDetail.refetch(); }}
+                >
                   {fileDetail.data && (
                     <div className="report-detail-content">
                       <p className="detail-name">{fileDetail.data.filename}</p>

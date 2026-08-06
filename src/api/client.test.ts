@@ -12,7 +12,7 @@ describe("tallyApi", () => {
     await tallyApi.files({ start: "2026-07-01", end: "2026-07-31" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://192.168.203.238:8800/files?limit=5000&offset=0&start=2026-07-01&end=2026-07-31",
+      "/api/files?limit=5000&offset=0&start=2026-07-01&end=2026-07-31",
       expect.objectContaining({ headers: { Accept: "application/json" } }),
     );
   });
@@ -25,7 +25,7 @@ describe("tallyApi", () => {
     await tallyApi.solutionTotals({ start: "", end: "" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://192.168.203.238:8800/solutions?totals=true&limit=5000&offset=0",
+      "/api/solutions?totals=true&limit=5000&offset=0",
       expect.any(Object),
     );
   });

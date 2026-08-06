@@ -10,9 +10,7 @@ import type {
   SolutionTotalOut,
 } from "./types";
 
-const API_ROOT = (
-  import.meta.env.VITE_TALLY_API_BASE_URL || "http://192.168.203.238:8800"
-).replace(/\/$/, "");
+const API_ROOT = "/api";
 const PAGE_LIMIT = 5000;
 
 export class ApiError extends Error {
@@ -25,6 +23,20 @@ export class ApiError extends Error {
   }
 }
 
+export class NetworkError extends Error {
+  constructor(message = "Unable to reach the Tally API. Check the network connection and try again.") {
+    super(message);
+    this.name = "NetworkError";
+  }
+}
+
+export class ResponseFormatError extends Error {
+  constructor() {
+    super("The Tally API returned an invalid JSON response.");
+    this.name = "ResponseFormatError";
+  }
+}
+
 function paramsFor(range: DateRange, extra: Record<string, string> = {}) {
   const params = new URLSearchParams(extra);
   if (range.start) params.set("start", range.start);
@@ -33,10 +45,16 @@ function paramsFor(range: DateRange, extra: Record<string, string> = {}) {
 }
 
 async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${API_ROOT}${path}`, {
-    headers: { Accept: "application/json" },
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_ROOT}${path}`, {
+      headers: { Accept: "application/json" },
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    throw new NetworkError();
+  }
 
   if (!response.ok) {
     let detail = "";
@@ -49,7 +67,11 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
     throw new ApiError(`API request failed (${response.status})${detail}`, response.status);
   }
 
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new ResponseFormatError();
+  }
 }
 
 export const tallyApi = {
