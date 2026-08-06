@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { createPortal } from "react-dom";
 import {
   Bar,
   BarChart,
@@ -60,6 +61,7 @@ const plcOptions = [
 ] as const;
 
 const dashboardSections = ["data-selection", "summary", "grade-mix", "solutions-rejects", "reports"] as const;
+type DashboardSection = (typeof dashboardSections)[number];
 
 type ProductionDisplayRow = ProductionSummaryRow & Pick<
   RecoveryRow,
@@ -72,9 +74,15 @@ export function App() {
   const [selectedPlc, setSelectedPlc] = useState<(typeof plcOptions)[number]>("Board Edger");
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<(typeof dashboardSections)[number]>("data-selection");
+  const [hiddenProductionColumns, setHiddenProductionColumns] = useState<Set<string>>(() => new Set());
+  const [columnFilterOpen, setColumnFilterOpen] = useState(false);
+  const [columnFilterPosition, setColumnFilterPosition] = useState({ top: 0, right: 0 });
+  const [activeSection, setActiveSection] = useState<DashboardSection | null>("data-selection");
   const gradeChartRef = useRef<HTMLDivElement>(null);
   const solutionChartRef = useRef<HTMLDivElement>(null);
+  const navigationTargetRef = useRef<DashboardSection | null>(null);
+  const columnFilterRef = useRef<HTMLDivElement>(null);
+  const columnFilterMenuRef = useRef<HTMLDivElement>(null);
   const invalidRange = Boolean(draftRange.start && draftRange.end && draftRange.start > draftRange.end);
 
   useEffect(() => {
@@ -82,17 +90,40 @@ export function App() {
 
     const updateActiveSection = () => {
       animationFrame = 0;
-      let currentSection: (typeof dashboardSections)[number] = "data-selection";
-
-      for (const sectionId of dashboardSections) {
+      const sectionBounds = dashboardSections.map((sectionId) => {
         const section = document.getElementById(sectionId);
-        const sectionBoundary = sectionId === "data-selection" ? 1 : 9;
-        if (section && section.getBoundingClientRect().top <= sectionBoundary) currentSection = sectionId;
+        if (!section) return null;
+
+        const bounds = section.getBoundingClientRect();
+        const dataSelectionEnd = sectionId === "data-selection"
+          ? document.querySelector<HTMLElement>(".metric-grid")?.getBoundingClientRect().bottom
+          : undefined;
+        return { id: sectionId, top: bounds.top, bottom: dataSelectionEnd ?? bounds.bottom };
+      }).filter((bounds): bounds is { id: DashboardSection; top: number; bottom: number } => bounds !== null);
+
+      let currentSection: DashboardSection | null = sectionBounds[0]?.id ?? null;
+      for (let index = 1; index < sectionBounds.length; index += 1) {
+        const previousBounds = sectionBounds[index - 1];
+        if (previousBounds.bottom <= 1) currentSection = sectionBounds[index].id;
+      }
+
+      const navigationTarget = navigationTargetRef.current;
+      if (navigationTarget) {
+        currentSection = navigationTarget;
+        const target = document.getElementById(navigationTarget);
+        if (target) {
+          const targetOffset = Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0;
+          if (Math.abs(target.getBoundingClientRect().top - targetOffset) <= 2) {
+            navigationTargetRef.current = null;
+          }
+        }
       }
       setActiveSection(currentSection);
-      const nextHash = `#${currentSection}`;
-      if (window.location.hash !== nextHash) {
-        window.history.replaceState(window.history.state, "", nextHash);
+      if (currentSection) {
+        const nextHash = `#${currentSection}`;
+        if (window.location.hash !== nextHash) {
+          window.history.replaceState(window.history.state, "", nextHash);
+        }
       }
     };
 
@@ -109,6 +140,44 @@ export function App() {
       window.removeEventListener("resize", scheduleUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    if (!columnFilterOpen) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!columnFilterRef.current?.contains(target) && !columnFilterMenuRef.current?.contains(target)) {
+        setColumnFilterOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setColumnFilterOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [columnFilterOpen]);
+
+  useEffect(() => {
+    if (!columnFilterOpen) return;
+
+    const positionMenu = () => {
+      const bounds = columnFilterRef.current?.getBoundingClientRect();
+      if (bounds) setColumnFilterPosition({ top: bounds.bottom + 7, right: window.innerWidth - bounds.right });
+    };
+
+    positionMenu();
+    window.addEventListener("resize", positionMenu);
+    window.addEventListener("scroll", positionMenu, true);
+    return () => {
+      window.removeEventListener("resize", positionMenu);
+      window.removeEventListener("scroll", positionMenu, true);
+    };
+  }, [columnFilterOpen]);
 
   useQuery({
     queryKey: ["health"],
@@ -186,6 +255,27 @@ export function App() {
     { key: "recovery", label: "Recovery BF/CF", numeric: true, render: (row) => display(row.recovery_bf_cf) },
     { key: "fiber", label: "Fiber ratio", numeric: true, render: (row) => display(row.fiber_ratio) },
   ];
+  const visibleProductionColumns = productionColumns.filter((column) => !hiddenProductionColumns.has(column.key));
+  const allOptionalProductionColumnsVisible = productionColumns
+    .filter((column) => column.key !== "date")
+    .every((column) => !hiddenProductionColumns.has(column.key));
+
+  function toggleProductionColumn(columnKey: string) {
+    setHiddenProductionColumns((current) => {
+      const next = new Set(current);
+      if (next.has(columnKey)) next.delete(columnKey);
+      else next.add(columnKey);
+      return next;
+    });
+  }
+
+  function toggleAllProductionColumns() {
+    if (allOptionalProductionColumnsVisible) {
+      setHiddenProductionColumns(new Set(productionColumns.filter((column) => column.key !== "date").map((column) => column.key)));
+    } else {
+      setHiddenProductionColumns(new Set());
+    }
+  }
 
   const fileColumns: Array<Column<FileOut>> = [
     { key: "id", label: "ID", numeric: true, render: (row) => row.file_id },
@@ -222,22 +312,25 @@ export function App() {
     setSelectedFileId(null);
   }
 
+  function selectNavigationSection(section: DashboardSection) {
+    navigationTargetRef.current = section;
+    setActiveSection(section);
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <a className="brand" href="#data-selection" aria-label="Tally Dashboard home">
-          <span className="brand-mark" aria-hidden="true">
-            <img src={treeLogo} alt="" />
-          </span>
-          <span>Tally Dashboard</span>
+          <span>Log Tally Dashboard</span>
         </a>
         <nav aria-label="Dashboard sections">
-          <a className={`nav-link ${activeSection === "data-selection" ? "active" : ""}`} href="#data-selection">Data Selection</a>
-          <a className={`nav-link ${activeSection === "summary" ? "active" : ""}`} href="#summary">Summary</a>
-          <a className={`nav-link ${activeSection === "grade-mix" ? "active" : ""}`} href="#grade-mix">Grade Mix</a>
-          <a className={`nav-link ${activeSection === "solutions-rejects" ? "active" : ""}`} href="#solutions-rejects">Solutions &amp; Rejects</a>
-          <a className={`nav-link ${activeSection === "reports" ? "active" : ""}`} href="#reports">Reports</a>
+          <a className={`nav-link ${activeSection === "data-selection" ? "active" : ""}`} href="#data-selection" onClick={() => selectNavigationSection("data-selection")}>Data Selection</a>
+          <a className={`nav-link ${activeSection === "summary" ? "active" : ""}`} href="#summary" onClick={() => selectNavigationSection("summary")}>Summary</a>
+          <a className={`nav-link ${activeSection === "grade-mix" ? "active" : ""}`} href="#grade-mix" onClick={() => selectNavigationSection("grade-mix")}>Grade Mix</a>
+          <a className={`nav-link ${activeSection === "solutions-rejects" ? "active" : ""}`} href="#solutions-rejects" onClick={() => selectNavigationSection("solutions-rejects")}>Solutions &amp; Rejects</a>
+          <a className={`nav-link ${activeSection === "reports" ? "active" : ""}`} href="#reports" onClick={() => selectNavigationSection("reports")}>Reports</a>
         </nav>
+        <img className="sidebar-tree" src={treeLogo} alt="" aria-hidden="true" />
       </aside>
 
       <div className="dashboard-surface">
@@ -293,8 +386,10 @@ export function App() {
                 onChange={(event) => setDraftRange((current) => ({ ...current, end: event.target.value }))}
               />
             </label>
-            <button className="primary-button" type="submit" disabled={invalidRange}>Apply Dates</button>
-            <button className="secondary-button" type="button" onClick={showAllDates}>All Dates</button>
+            <div className="date-actions">
+              <button className="primary-button" type="submit" disabled={invalidRange}>Apply Dates</button>
+              <button className="secondary-button" type="button" onClick={showAllDates}>All Dates</button>
+            </div>
           </form>
           {invalidRange && <p className="validation-message" role="alert">Start date must be on or before end date.</p>}
           <p className="filter-note">
@@ -315,7 +410,49 @@ export function App() {
 
         <div className="dashboard-grid">
           <section id="summary" className="wide-panel section-anchor">
-          <Panel title="Production Summary" eyebrow="Report rows">
+          <Panel
+            title="Production Summary"
+            eyebrow="Report rows"
+            action={(
+              <>
+              <div className="column-filter" ref={columnFilterRef}>
+                <button
+                  className="column-filter-button"
+                  type="button"
+                  aria-expanded={columnFilterOpen}
+                  aria-controls="production-column-filter"
+                  onClick={() => setColumnFilterOpen((open) => !open)}
+                >
+                  Filter
+                </button>
+              </div>
+                {columnFilterOpen && createPortal(
+                  <div
+                    className="column-filter-menu column-filter-menu-portal"
+                    id="production-column-filter"
+                    ref={columnFilterMenuRef}
+                    style={columnFilterPosition}
+                  >
+                    <button className="column-filter-toggle-all" type="button" onClick={toggleAllProductionColumns}>
+                      {allOptionalProductionColumnsVisible ? "Deselect All" : "Select All"}
+                    </button>
+                    {productionColumns.map((column) => (
+                      <label key={column.key}>
+                        <input
+                          type="checkbox"
+                          checked={!hiddenProductionColumns.has(column.key)}
+                          disabled={column.key === "date"}
+                          onChange={() => toggleProductionColumn(column.key)}
+                        />
+                        {column.label}
+                      </label>
+                    ))}
+                  </div>,
+                  document.body,
+                )}
+              </>
+            )}
+          >
             <QueryState
               isPending={production.isPending || recovery.isPending}
               error={production.error ?? recovery.error}
@@ -323,7 +460,7 @@ export function App() {
             >
               <DataTable
                 caption="Production Summary"
-                columns={productionColumns}
+                columns={visibleProductionColumns}
                 rows={productionRows}
                 rowKey={(row) => String(row.file_id)}
                 emptyMessage="No production rows were returned for these dates."

@@ -5,16 +5,20 @@ interface PanelProps {
   eyebrow?: string;
   children: ReactNode;
   action?: ReactNode;
+  titleAction?: ReactNode;
   className?: string;
 }
 
-export function Panel({ title, eyebrow, children, action, className = "" }: PanelProps) {
+export function Panel({ title, eyebrow, children, action, titleAction, className = "" }: PanelProps) {
   return (
     <section className={`panel ${className}`}>
       <header className="panel-heading">
         <div>
           {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-          <h2>{title}</h2>
+          <div className="panel-title-row">
+            <h2>{title}</h2>
+            {titleAction}
+          </div>
         </div>
         {action}
       </header>

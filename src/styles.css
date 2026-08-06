@@ -26,20 +26,19 @@ h1 { font-size: clamp(2rem, 3.5vw, 3.7rem); letter-spacing: -0.055em; line-heigh
 h2 { font-size: 1.16rem; letter-spacing: -0.025em; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
-.sidebar { background: var(--forest); color: white; min-height: 100vh; padding: 30px 20px 24px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
-.brand { color: white; display: flex; align-items: center; gap: 12px; font-size: 1.02rem; font-weight: 750; letter-spacing: -.02em; text-decoration: none; padding: 0 8px 30px; }
-.brand-mark { align-items: center; background: var(--amber); border-radius: 9px; color: var(--forest); display: inline-flex; font-size: 1.1rem; font-weight: 900; height: 36px; justify-content: center; width: 36px; }
-.brand-mark img { display: block; height: 33px; object-fit: contain; width: 25px; }
-.sidebar nav { display: grid; gap: 5px; }
+.sidebar { background: var(--forest); color: white; min-height: 100vh; overflow: hidden; padding: 30px 20px 24px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; isolation: isolate; }
+.brand { color: white; display: flex; align-items: center; gap: 12px; font-family: "Brush Script MT", "Segoe Script", cursive; font-size: 1.4rem; font-weight: 600; letter-spacing: 0; line-height: 1.35; text-decoration: none; padding: 0 8px 30px; position: relative; z-index: 1; }
+.sidebar nav { display: grid; gap: 5px; position: relative; z-index: 1; }
+.sidebar-tree { bottom: 24px; filter: brightness(0); height: auto; left: -8px; opacity: .11; pointer-events: none; position: absolute; width: 280px; z-index: 0; }
 .nav-link { border-radius: 8px; color: #ffe1cc; font-size: .88rem; font-weight: 650; padding: 11px 13px; text-decoration: none; transition: background .15s ease, color .15s ease; }
 .nav-link:hover, .nav-link:focus-visible { background: rgba(255,255,255,.09); color: white; }
 .nav-link.active { background: rgba(255,255,255,.13); color: white; }
 .sidebar-note { color: #91aaa3; font-size: .72rem; line-height: 1.5; margin: auto 8px 0; }
 .dashboard-surface { background: #f4efe9; min-width: 0; }
-.page-header { min-height: 190px; padding: 48px clamp(24px, 4vw, 64px) 70px; display: flex; align-items: flex-end; justify-content: flex-start; gap: 22px; }
+.page-header { min-height: 190px; width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding: 48px 0 70px; display: flex; align-items: flex-end; justify-content: flex-start; gap: 22px; }
 .refresh-status { color: var(--muted); font-size: .8rem; padding-top: 10px; }
 .plc-control { min-width: 180px; }
-.plc-control select { appearance: auto; min-width: 180px; }
+.plc-control select { appearance: auto; font-size: 1rem; font-weight: 700; min-width: 180px; }
 .plc-control select:hover { opacity: .72; }
 .plc-control select:focus-visible { outline: 3px solid rgba(244,119,0,.35); outline-offset: 2px; }
 .plc-control option { transition: opacity .15s ease; }
@@ -57,6 +56,7 @@ main { width: min(1480px, calc(100% - 48px)); margin: -42px auto 0; position: re
 .filter-bar, .panel, .detail-drawer { background: var(--paper); border: 1px solid rgba(70,38,20,.09); box-shadow: var(--shadow); }
 .filter-bar { border-radius: 16px; padding: 24px 28px; display: grid; grid-template-columns: minmax(190px, .7fr) 2fr; align-items: center; gap: 12px 30px; }
 .filter-bar form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.date-actions { display: flex; gap: 12px; }
 label { display: grid; gap: 7px; color: var(--muted); font-size: .76rem; font-weight: 600; }
 .window-input { min-height: 42px; border: 1px solid var(--line); border-radius: 7px; background: white; color: var(--ink); padding: 7px 10px; transition: opacity .15s ease; }
 .window-input:hover { opacity: .72; cursor: pointer; }
@@ -87,18 +87,36 @@ input:focus, button:focus-visible, summary:focus-visible { outline: 3px solid rg
 #reports .report-panel-view { min-height: 0; overflow: auto; }
 #reports .report-list-view { display: flex; flex-direction: column; }
 #reports .report-list-view .table-scroll { height: 100%; max-height: none; }
+#reports .report-list-view > .loading-state,
+#reports .report-list-view > .empty-state { display: grid; flex: 1; font-size: clamp(1.15rem, 2vw, 1.55rem); font-weight: 600; grid-template-rows: 2fr 1fr; margin: 0; place-items: center; }
 .paired-panel-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .panel { border-radius: 14px; min-width: 0; overflow: hidden; }
 .chart-panel { overflow: visible; position: relative; z-index: 2; }
 .wide-panel { grid-column: 1 / -1; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; padding: 22px 24px 17px; border-bottom: 1px solid #e7e9e4; }
 .panel-heading .eyebrow { margin-bottom: 5px; }
+.panel-title-row { align-items: center; display: flex; gap: 12px; }
+.column-filter { margin: 0; position: relative; }
+.column-filter-button { background: transparent; border: 1px solid var(--line); border-radius: 7px; color: #c84f00; font-size: .86rem; font-weight: 700; padding: 6px 11px; }
+.column-filter-button:hover { opacity: .72; }
+.column-filter-menu { background: var(--paper); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow); display: grid; gap: 8px; max-height: 330px; min-width: 190px; overflow: auto; padding: 12px; position: absolute; right: 0; top: calc(100% + 7px); z-index: 20; }
+.column-filter-menu-portal { position: fixed; z-index: 10000; }
+.column-filter-menu label { align-items: center; cursor: pointer; display: flex; gap: 8px; white-space: nowrap; }
+.column-filter-menu input { accent-color: var(--forest); margin: 0; }
+.column-filter-menu label:has(input:disabled) { cursor: default; opacity: .6; }
+.column-filter-toggle-all { background: var(--forest-soft); border: 0; border-radius: 6px; color: #9d3f05; font-size: .76rem; font-weight: 700; margin-bottom: 3px; padding: 7px 9px; text-align: left; }
+.column-filter-toggle-all:hover { opacity: .72; }
 .table-scroll { overflow: auto; max-height: 380px; }
 table { border-collapse: collapse; width: 100%; font-size: .83rem; }
 th, td { border-bottom: 1px solid #eceee9; padding: 12px 18px; text-align: left; white-space: nowrap; }
 th { color: var(--muted); background: #f8f7f2; font-size: .69rem; letter-spacing: .06em; position: sticky; top: 0; text-transform: uppercase; }
 td.numeric, th.numeric { text-align: right; font-variant-numeric: tabular-nums; }
 tbody tr:hover { background: #fbfaf5; }
+#summary th:first-child,
+#summary td:first-child { background: var(--paper); left: 0; position: sticky; z-index: 2; }
+#summary th:first-child { background: #f8f7f2; z-index: 4; }
+#summary td:first-child { box-shadow: 6px 0 8px -8px rgba(51,37,31,.45); }
+#summary tbody tr:hover td:first-child { background: #fbfaf5; }
 .text-button { background: none; border: 0; color: #c84f00; font-weight: 700; padding: 3px; }
 .empty-state, .loading-state { color: var(--muted); margin: 0; padding: 30px 24px; text-align: center; }
 .loading-state { animation: pulse 1.3s ease-in-out infinite; }
@@ -149,16 +167,17 @@ pre { background: #fff0e3; border: 1px solid #f2d2bb; border-radius: 8px; color:
   .app-shell { display: block; }
   .sidebar { min-height: 0; height: auto; padding: 14px 12px; position: relative; }
   .brand { padding: 0 4px 14px; }
-  .brand-mark { height: 32px; width: 32px; }
+  .sidebar-tree { bottom: -82px; left: auto; right: 8px; width: 115px; }
   .sidebar nav { display: flex; gap: 4px; overflow-x: auto; }
   .nav-link { padding: 9px 11px; white-space: nowrap; }
   .sidebar-note { display: none; }
-  .page-header { min-height: 150px; padding: 32px 18px 60px; }
+  .page-header { min-height: 150px; width: min(100% - 24px, 1480px); padding: 32px 0 60px; }
   .page-header { align-items: flex-start; flex-direction: column; }
   main { width: min(100% - 24px, 1480px); }
   .filter-bar { padding: 20px; }
   .filter-bar form { align-items: stretch; display: grid; grid-template-columns: 1fr 1fr; }
-  .filter-bar button { width: 100%; }
+  .date-actions { grid-column: 1 / -1; }
+  .date-actions button { flex: 1; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .dashboard-grid { grid-template-columns: 1fr; }
   .paired-panel-row { grid-template-columns: 1fr; }
