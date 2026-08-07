@@ -1,352 +1,330 @@
-# Lumber Tally Dashboard Project
+# Lumber Tally Dashboard — Project Record
 
 ## Purpose
 
-This file is the durable project record for the lumber tally dashboard. It captures
-the project's goals, constraints, architecture, technical decisions, known
-unknowns, and change history so that implementation can be reviewed and resumed
-without relying on conversation history.
+This document records the current product scope, architecture, technical
+decisions, operational constraints, and unresolved production questions. It is
+the durable engineering record for the project; setup and presentation material
+belong in the [README](../README.md), while endpoint details belong in the
+[API integration reference](API.md).
 
-This manifest must be reviewed and updated as part of every material project
-change. A change is not considered complete until the affected decisions,
-architecture, behavior, dependencies, files, verification results, and known
-follow-up work are recorded here.
-
-## Project status
+## Current status
 
 | Item | Current state |
 |---|---|
-| Phase | Basic dashboard implementation complete; ready for review and iteration |
-| Dashboard implementation | Runnable initial version |
-| API | Existing SFP Tally API, version `0.1.0` |
-| Deployment target | A local web application on the same private network as the API and its data source |
-| Containerization | Not used; Docker is intentionally deferred |
-| Last updated | 2026-07-31 (basic dashboard implementation) |
+| Phase | Functional demo approaching production readiness |
+| Application | Responsive, read-only React dashboard |
+| Supported PLC | Board Edger |
+| API | Bronze tally table API |
+| Deployment | Local/private-network static application; final host undecided |
+| Test coverage | Unit, component, API integration, accessibility, and Playwright workflows |
+| Containerization | Not used; native deployment remains preferred |
+| Last reviewed | 2026-08-07 |
+
+The dashboard is suitable for demonstrations and stakeholder review. Production
+release still requires deployment hardening, an agreed security model,
+monitoring, and live-environment acceptance testing.
 
 ## Product objective
 
-Build a locally hosted, read-only dashboard that securely presents data from the
-SFP Tally API. The first version must allow users to view associated data for a
-specific date or across a selected date range.
+Provide production teams with an accessible, read-only view of lumber tally
+data. Users can select a reporting window, review operational summaries, inspect
+board-foot distributions and reject/solution totals, and open the complete data
+for an individual report.
 
-The dashboard and API are expected to run at the location where the source data
-is generated and remain accessible only to intended users on that network.
+The application must remain useful on a private network without relying on
+third-party runtime assets or public internet access.
 
-## Initial functional scope
+## Implemented scope
 
-The first dashboard iteration is expected to include:
+- Date-range and all-date report selection.
+- PLC selection UI with Board Edger enabled and future PLCs represented.
+- Production metrics for report count, input pieces and volume, edger output,
+  and projected lumber value.
+- Production summary table with sticky date column and configurable columns.
+- Table and proportional board-dimension views.
+- Board-foot charts grouped by grade, thickness, width, or length.
+- Natural ordering for numeric dimensions, fractional thicknesses, and grades.
+- Solution-total bar chart and reject-reason table.
+- Complete report view with expandable raw JSON.
+- Cursor-following, viewport-aware tooltips.
+- Scroll-aware navigation with URL hash synchronization.
+- Responsive desktop, tablet, and mobile layouts.
+- Loading, empty, validation, retry, and network-error states.
+- Deterministic automated tests and CI verification.
 
-- A single-date and date-range selector.
-- Summary metrics for the selected period.
-- Production-summary and recovery views.
-- Solution, reject-reason, and grade-mix views.
-- A report-file list and a way to inspect an individual file's details.
-- Explicit loading, empty, validation-error, API-unavailable, and unexpected-error states.
-- A responsive layout suitable for desktop and tablet displays.
+## Current exclusions
 
-### Out of scope for the initial iteration
-
-- Editing API data.
+- Editing or writing API data.
 - A dashboard-owned database.
+- Support for PLCs other than Board Edger.
 - Public internet exposure.
-- Docker or other container-based deployment.
-- A separate dashboard application backend unless a concrete requirement emerges.
-- User accounts or application-level authorization until access requirements are defined.
+- User accounts or application-level authorization.
+- Docker-based deployment.
+- A separate dashboard backend, unless deployment or security requirements make
+  one necessary.
 
-## API context
+## API integration
 
-The current integration contract is documented in `Documentation/API.md`.
+The dashboard uses the current Bronze API described in [API.md](API.md).
 
-### Observed API details
-
-| Item | Value |
+| Resource | Purpose |
 |---|---|
-| API | Bronze tally tables |
-| Base URL | Configured through `VITE_TALLY_API_BASE_URL` |
-| Media type | `application/json` |
-| Operations | Read-only `GET` requests |
-| Pagination | `limit` and `offset`; observed response cap of 1,000 rows |
-| Filtering | Date filtering and dashboard aggregation occur in the client |
-
-### Available endpoints
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/bronze/tables` | Table names and row counts |
-| `GET /api/bronze/tally/files` | Report metadata |
-| `GET /api/bronze/tally/summary` | Production and recovery metrics |
+| `GET /api/bronze/tables` | Table names and row counts used to plan pagination |
+| `GET /api/bronze/tally/files` | Report metadata and report dates |
+| `GET /api/bronze/tally/summary` | Production and recovery summary values |
 | `GET /api/bronze/tally/solutions` | Per-file solution rows |
 | `GET /api/bronze/tally/reject-reasons` | Per-file reject counts |
 | `GET /api/bronze/tally/detail-lines` | Board dimensions, pieces, and board feet |
 
-The dashboard joins bronze resources on `file_id`, performs inclusive date
-filtering against `report_datetime`, and computes chart totals locally. These
-application semantics and the response envelope are recorded in the API document.
+The service returns bronze envelopes whose domain records are nested in
+`payload`. It does not currently expose the dashboard's date-filtered joins and
+aggregates.
 
-## Chosen technical direction
+The client therefore:
 
-### Frontend
+1. Reads table row counts.
+2. Requests all required 1,000-row pages concurrently.
+3. Unwraps row payloads.
+4. Joins resources using `file_id`.
+5. Applies inclusive date filtering to the date portion of `report_datetime`.
+6. Calculates chart and table aggregates locally.
+7. Shares in-flight reads and caches completed tables for one minute.
 
-- **React with TypeScript** for component-based UI development and compile-time
-  validation of API models.
-- **Vite** for development, builds, and static production assets.
-- **TanStack Query** for server-state fetching, cache management, retries, and
-  loading/error state coordination.
-- **Recharts** for dashboard visualizations.
-- **Plain CSS using design tokens** for responsive styling and consistent visual
-  decisions without adopting a large UI component framework initially.
-- **Vitest and React Testing Library** for unit and component tests.
-- **Playwright** for a focused set of end-to-end tests around filtering and failure states.
+This approach reduced a measured full sequential load from approximately 52.5
+seconds to approximately 13 seconds on the observed network. Lightweight panels
+resolve independently rather than waiting for the detail-line table.
 
-### Hosting and API routing
+## Architecture
 
-The production frontend will be compiled to static files and served by a local
-web server. During development and preview, same-origin `/api` requests are
-forwarded to the origin configured by `VITE_TALLY_API_BASE_URL`.
+### Runtime
 
 ```text
 Browser
-   |-- dashboard assets -> local dashboard web server
-   `-- /api requests    -> configured Bronze API origin
+  ├── static React application
+  └── same-origin /api requests
+          └── web-server or Vite proxy
+                  └── Bronze tally API
 ```
 
-### Local development
+The frontend is built as static assets. Vite provides the `/api` proxy during
+development and preview. A production web server must provide equivalent SPA
+routing and reverse-proxy behavior.
 
-During development and production, `VITE_TALLY_API_BASE_URL` configures the API
-origin. Local environment files may provide the deployment-specific address.
+### Frontend responsibilities
 
-Node.js LTS is installed at `C:\Program Files\nodejs`. Its installer registered
-that directory in the Windows machine PATH. Terminals and editor processes that
-were open before installation retain an older PATH snapshot and must be restarted
-before `node` and `npm` resolve normally. For an immediate refresh in an existing
-PowerShell session, run:
+- **React 19 and TypeScript:** interface and typed application boundaries.
+- **TanStack Query:** server-state lifecycle, retries, caching, and refresh state.
+- **Recharts:** bar-chart rendering.
+- **Plain CSS:** responsive layout and visual design without runtime style
+  dependencies.
+- **Vitest and Testing Library:** data, API, component, and workflow tests.
+- **axe-core:** automated accessibility checks.
+- **Playwright:** production-build desktop and mobile browser workflows.
 
-```powershell
-$env:Path = "$([Environment]::GetEnvironmentVariable('Path','Machine'));$([Environment]::GetEnvironmentVariable('Path','User'))"
-```
-
-### Deployment without Docker
-
-Docker is intentionally excluded for now. The anticipated deployment consists of:
-
-1. Installing a supported Node.js release on the development/build machine.
-2. Installing dependencies and producing a static Vite build.
-3. Copying the generated assets to the local production host if it is a different machine.
-4. Running a native web server as an operating-system service.
-5. Configuring the web server to serve the SPA and reverse-proxy `/api` to the API.
-6. Restricting inbound access using the host firewall and intended network boundaries.
-
-The exact commands and service configuration will be documented once the target
-host operating system is known.
-
-## Security posture
-
-Same-network hosting reduces exposure but does not itself provide authentication
-or authorization. The initial security posture is:
-
-- Do not expose the dashboard or API to the public internet.
-- Bind services only to interfaces required for local access.
-- Restrict inbound traffic with the host firewall and network policy.
-- Proxy browser API traffic through the dashboard origin rather than requiring
-  direct browser access to the API host and port.
-- Do not place secrets, credentials, or environment-specific addresses in source code.
-- Add proxy-level or organization-integrated authentication if the audience or
-  network trust model requires it.
-- Decide whether local HTTPS is required after the host environment and client
-  certificate-trust options are known.
-
-## Architecture principles
-
-- Keep the initial system read-only and small.
-- Treat the existing API as the source of truth.
-- Generate TypeScript interfaces from or reconcile them with the OpenAPI schemas.
-- Keep environment-specific addresses in configuration.
-- Centralize API access and response normalization rather than fetching directly
-  from presentation components.
-- Make date selection part of the query key so cached results correspond to the
-  active filter.
-- Display units and labels only when their meanings are supported by documentation.
-- Preserve raw API values where interpretation is uncertain.
-- Build accessible filters, tables, charts, and error messages.
-- Add dependencies only when they solve a current, documented requirement.
-
-## Proposed application structure
-
-This is a proposed structure, not yet implemented:
+### Source organization
 
 ```text
 src/
-  api/          API client, endpoint functions, and response types
-  components/   Reusable UI and visualization components
-  features/     Date filters and domain-specific dashboard sections
-  pages/        Page-level composition
-  styles/       Design tokens and global styles
-  test/         Shared test setup and fixtures
+  api/                 Bronze client, response normalization, domain types
+  components/
+    charts/             Board mix, solutions, and rejects
+    data-selection/     Page header, PLC, and date controls
+    production/         Summary table, filters, and board visualization
+    reports/            Report list and detail presentation
+    sidebar/            Navigation and generated tree artwork
+  constants/            Shared dashboard option and section definitions
+  hooks/                React lifecycle and DOM interaction behavior
+  utils/                Pure data, formatting, and positioning functions
+  test/                 Unit, component, accessibility, fixtures, and e2e tests
+  App.tsx               Shared state, queries, derived models, page composition
+  main.tsx              React and QueryClient bootstrap
+  styles.css            Global responsive visual system
 ```
 
-## Decision log
+Component code owns distinct interface regions. Hooks own React state/effect
+behavior such as scroll spying, floating-menu positioning, and canvas lifecycle.
+Utilities own reusable calculations that do not depend on React.
 
-### D-001: Maintain a durable project manifest
+## Configuration and deployment
 
-- **Date:** 2026-07-31
-- **Status:** Accepted
-- **Decision:** Maintain `PROJECT_MANIFEST.md` as the central record of project
-  direction, decisions, material changes, verification, and unresolved questions.
-- **Reason:** The project needs durable context that can be reviewed independently
-  of chat history and kept current as implementation evolves.
-- **Consequence:** Every material change includes a manifest review and, when
-  relevant, an update to its decisions, architecture, inventory, or change log.
+`VITE_TALLY_API_BASE_URL` identifies the upstream API origin for the Vite proxy.
+Deployment-specific values belong in ignored environment files or host
+configuration, not source control.
 
-### D-002: Use a client-side React and TypeScript application
+The expected native deployment process is:
 
-- **Date:** 2026-07-31
-- **Status:** Accepted and implemented
-- **Decision:** Use React, TypeScript, and Vite for the dashboard frontend.
-- **Reason:** The product is an interactive, read-only dashboard backed by an
-  existing API. A static single-page application provides the necessary UI model
-  without requiring another application backend.
-- **Consequence:** Production output can be served as static files, and API access
-  will use a reverse proxy for same-origin requests.
+1. Install a supported Node.js release on the build machine.
+2. Run `npm ci` and `npm run test:all`.
+3. Produce static assets with `npm run build`.
+4. Serve `dist/` using the selected production web server.
+5. Configure SPA fallback and reverse-proxy `/api` to the Bronze API.
+6. Restrict inbound access using host firewall and network policy.
+7. Add HTTPS, authentication, logging, and monitoring as required by the agreed
+   production environment.
 
-### D-003: Use focused data and visualization libraries
+Vite preview is only a build-verification server, not the recommended production
+host.
 
-- **Date:** 2026-07-31
-- **Status:** Accepted and implemented in the initial scope
-- **Decision:** Use TanStack Query for API server state and Recharts for charts.
-- **Reason:** Query caching and lifecycle handling are central to date-filtered API
-  views, while Recharts provides React-native chart composition without requiring
-  a custom visualization layer.
-- **Consequence:** These libraries are production dependencies and are accessed
-  through typed API functions and reusable components. Playwright is deferred
-  until the dashboard has stable user flows worth exercising end to end.
+## Security posture
 
-### D-004: Defer Docker
+- Keep the dashboard and API on the intended private network.
+- Do not commit credentials, private deployment addresses, or environment files.
+- Proxy API traffic through the dashboard origin.
+- Treat network location as a boundary, not as authentication.
+- Add organization-integrated or proxy-level authentication if users cannot all
+  share the same trust level.
+- Decide HTTPS and certificate requirements before production deployment.
+- Keep the application read-only unless a separately reviewed write workflow is
+  introduced.
 
-- **Date:** 2026-07-31
-- **Status:** Accepted
-- **Decision:** Do not use Docker for development or initial deployment.
-- **Reason:** The project owner prefers a native local deployment for the initial phase.
-- **Consequence:** Build prerequisites, static asset deployment, reverse-proxy
-  installation, service management, and upgrades must be documented for the host OS.
+## Quality and verification
 
-### D-005: Use a same-origin API reverse proxy
+The canonical local pipeline is:
 
-- **Date:** 2026-07-31
-- **Status:** Accepted; implemented for Vite development and preview
-- **Decision:** Serve the UI and proxy API requests through one dashboard origin.
-- **Reason:** This avoids browser CORS coupling, keeps the upstream API address in
-  deployment configuration, and provides a control point for TLS and access policy.
-- **Consequence:** Development and production each require proxy configuration.
+```bash
+npm run test:all
+```
 
-### D-006: Keep the first data presentation direct and inspectable
+It currently runs:
 
-- **Date:** 2026-07-31
-- **Status:** Accepted and implemented
-- **Decision:** Present production, recovery, solution-total, reject-total,
-  grade-mix, and file data with summary cards, one simple grade chart, tables,
-  and an inspectable file-detail panel.
-- **Reason:** The first milestone is to prove dependable access to all API data
-  before adding domain-specific transformations or a more elaborate visual hierarchy.
-- **Consequence:** Most data remains close to the API representation. The complete
-  selected file is also available as formatted raw JSON for fields not yet given
-  a dedicated presentation.
+- 20 Vitest tests across API behavior, calculations, components, dashboard
+  workflows, and accessibility.
+- TypeScript project compilation and a Vite production build.
+- Two Playwright workflows covering the primary desktop flow and mobile
+  navigation.
 
-### D-007: Default to today's date and fetch at most 5,000 rows per endpoint
+Playwright uses deterministic Bronze API fixtures. GitHub Actions runs the same
+pipeline on pushes and pull requests. Live API compatibility must still be
+verified as part of deployment acceptance.
 
-- **Date:** 2026-07-31
-- **Status:** Accepted as an initial assumption
-- **Decision:** Initialize both date inputs to the client's local date and request
-  the documented maximum page size (`limit=5000`, `offset=0`) for paginated endpoints.
-- **Reason:** This gives a useful specific-date landing view and minimizes the
-  chance that the first dashboard silently shows only the API's default 1,000 rows.
-- **Consequence:** The dashboard may still omit data when a query has more than
-  5,000 rows. Automatic pagination remains blocked on confirmation of stable
-  ordering and completion behavior. Users can explicitly choose “All dates.”
+## Architecture decisions
 
-### D-008: Avoid external runtime assets
+### AD-001: Client-side React application
 
-- **Date:** 2026-07-31
-- **Status:** Accepted and implemented
-- **Decision:** Use local system font stacks and bundle all application code and styles.
-- **Reason:** The dashboard must remain usable on a private network without public
-  internet access and should not leak browser requests to third-party asset hosts.
-- **Consequence:** Typography varies slightly by client operating system, but the
-  dashboard has no CDN or web-font dependency.
+- **Status:** Accepted and implemented.
+- **Decision:** Use React, TypeScript, and Vite to produce a static single-page
+  dashboard.
+- **Reason:** The product is interactive and read-only, and does not currently
+  require another application backend.
 
-## Open questions
+### AD-002: Same-origin API proxy
 
-| Question | Why it matters | Status |
-|---|---|---|
-| What operating system will host the dashboard? | Determines native web server, service management, and deployment instructions. | Open |
-| Will the production dashboard run on the API machine or a separate machine on the same LAN? | Determines proxy target, firewall rules, and failure boundaries. | Open |
-| Which users or devices may access it? | Determines whether network restrictions alone are sufficient. | Open |
-| Is HTTPS required on the local network? | Determines certificate issuance and client trust setup. | Open |
-| What timezone and date-bound semantics does the API use? | Required for accurate date filtering and labels. | Open |
-| What are the supported grade-mix groupings? | Determines which grouping controls can safely be offered. | Open |
-| What is the expected data volume and refresh frequency? | Influences pagination, caching, chart aggregation, and performance testing. | Open |
-| Which metrics are most important on the landing view? | Determines the initial information hierarchy. | Open |
+- **Status:** Accepted and implemented for development and preview.
+- **Decision:** Browser requests use `/api`; the serving layer forwards them to
+  the configured upstream API.
+- **Reason:** Avoid browser CORS coupling and keep the upstream origin out of UI
+  code.
 
-## Project inventory
+### AD-003: Client-side Bronze adapter
 
-| Path | Purpose | State |
-|---|---|---|
-| `PROJECT.md` | Decisions, architecture, project context, and change history | Active |
-| `Documentation/API.md` | Current Bronze API integration contract | Active |
-| `package.json` / `package-lock.json` | Dependencies and native npm run/build/test commands | Active |
-| `vite.config.ts` | React build plus configurable `/api` proxy for development and preview | Active |
-| `.env.example` | Example upstream API target configuration | Active |
-| `src/api/` | Typed API contracts, centralized HTTP client, and client tests | Active |
-| `src/components/` | Reusable panel, table, and query-state presentation | Active |
-| `src/App.tsx` | Date controls, queries, metrics, charts, tables, and file detail | Active |
-| `src/styles.css` | Responsive local-only visual system | Active |
-| `README.md` | Native setup, run, test, build, and preview instructions | Active |
-| `dist/` | Generated production build; ignored by source control | Generated |
+- **Status:** Accepted and implemented.
+- **Decision:** Centralize pagination, envelope normalization, joins, filtering,
+  and aggregation in `src/api/client.ts`.
+- **Reason:** The Bronze API exposes source tables rather than dashboard-shaped
+  resources.
+- **Consequence:** Initial load performance depends on total table size and API
+  latency; server-side filters or aggregates would be preferable at larger scale.
 
-## Verification record
+### AD-004: Concurrent pagination and short-lived table cache
 
-| Date | Change | Verification | Result |
-|---|---|---|---|
-| 2026-07-31 | Created project manifest | Manual content and scope review | Passed |
-| 2026-07-31 | API client | Vitest: 2 tests | Passed |
-| 2026-07-31 | Dashboard application | TypeScript project build and Vite production build | Passed |
-| 2026-07-31 | Local dashboard server | `GET http://127.0.0.1:5173` returned HTML with root mount | Passed (`200`) |
-| 2026-07-31 | Development API proxy | `GET /api/health` returned `{"status":"ok"}` | Passed (`200`) |
-| 2026-07-31 | Live endpoint compatibility | Read-only smoke requests to files, production, recovery, solution totals, reject totals, and grade mix | Passed |
-| 2026-07-31 | Node/npm command discovery | Confirmed persistent machine PATH and refreshed a stale shell environment | Passed (`node` 24.18.1, `npm` 11.16.0) |
+- **Status:** Accepted and implemented.
+- **Decision:** Use table counts to fetch required pages concurrently, share
+  in-flight promises, cache completed tables for one minute, and let panels
+  resolve independently.
+- **Reason:** Sequential pagination caused unacceptable startup latency and an
+  all-or-nothing dataset promise blocked lightweight panels.
 
-## Change log
+### AD-005: Feature components, hooks, and utilities
+
+- **Status:** Accepted and implemented.
+- **Decision:** Keep `App.tsx` focused on orchestration. Place interface regions
+  in components, React lifecycle behavior in hooks, and framework-independent
+  calculations in utilities.
+- **Reason:** Improve ownership, testability, and maintainability without creating
+  one file for every minor function.
+
+### AD-006: Native deployment; Docker deferred
+
+- **Status:** Accepted.
+- **Decision:** Do not require Docker for the demo or initial deployment.
+- **Reason:** The intended environment currently favors a native local service.
+- **Consequence:** Final web-server, service-management, and upgrade procedures
+  depend on the selected host operating system.
+
+### AD-007: No external runtime assets
+
+- **Status:** Accepted and implemented.
+- **Decision:** Bundle application code and styles and use local system fonts.
+- **Reason:** Preserve usability on a private network without public internet
+  access or third-party browser requests.
+
+### AD-008: Production-oriented automated verification
+
+- **Status:** Accepted and implemented.
+- **Decision:** Maintain unit, component, API, accessibility, build, and browser
+  tests under `src/test`, with CI running the complete pipeline.
+- **Reason:** The demo is approaching production readiness and critical workflows
+  need repeatable regression protection.
+
+## Open production questions
+
+| Question | Why it matters |
+|---|---|
+| Which operating system and web server will host the application? | Determines service, proxy, deployment, and update procedures. |
+| Will the dashboard and API share a host? | Determines firewall rules, proxy routing, and failure boundaries. |
+| Which users and devices may access the dashboard? | Determines authentication and authorization requirements. |
+| Is local HTTPS required? | Determines certificate issuance and client trust configuration. |
+| What are the authoritative timezone and date-bound semantics? | Required for production-grade filtering guarantees. |
+| When will other PLC data contracts become available? | Determines how PLC-specific endpoints, types, and UI modules should be introduced. |
+| What data volume and ingestion rate are expected in production? | Determines whether client-side full-table processing remains viable. |
+| What availability, logging, monitoring, and support targets apply? | Determines operational readiness and incident response requirements. |
+| Will the project remain Apache-licensed or become proprietary? | Must be settled before commercial distribution. |
+
+## Current inventory
+
+| Path | Responsibility |
+|---|---|
+| `README.md` | Public project presentation, setup, and usage |
+| `docs/API.md` | Current Bronze API integration contract |
+| `docs/PROJECT.md` | Architecture, decisions, status, and production questions |
+| `src/api/` | Typed API adapter and models |
+| `src/components/` | Feature-focused presentation and interaction components |
+| `src/hooks/` | React lifecycle and DOM behavior |
+| `src/utils/` | Data transformations, formatting, and positioning |
+| `src/test/` | All automated test functions, fixtures, and results location |
+| `src/App.tsx` | Dashboard state, queries, and composition |
+| `src/styles.css` | Responsive visual system |
+| `playwright.config.ts` | Browser-test configuration |
+| `vite.config.ts` | Build, test, development, and preview configuration |
+| `.github/workflows/test.yml` | Continuous verification pipeline |
+
+## Recent milestones
+
+### 2026-08-07
+
+- Migrated from the retired dashboard-shaped API to the Bronze tally API.
+- Verified representative data equivalence between old and new services.
+- Added complete pagination, concurrent page loading, request sharing, and cache
+  expiration.
+- Refactored the monolithic application into feature components, hooks, and
+  utilities.
+- Added deterministic natural ordering for mix-chart dimensions and grades.
+- Consolidated current API documentation and rewrote the public README.
+- Expanded verification to unit, component, API, accessibility, build, desktop,
+  and mobile browser tests.
 
 ### 2026-08-06
 
-- Routed browser data requests through a same-origin `/api` proxy in Vite development
-  and preview, using `VITE_TALLY_API_BASE_URL` only as the upstream proxy target.
-- Added error-aware exponential retries for transient network and server failures,
-  clearer network and invalid-response errors, and per-panel manual retry actions.
-- Kept client and validation errors non-retriable and prevented aborted requests from
-  being retried.
+- Added responsive dashboard sections, production filtering and visual mode,
+  chart and board tooltips, report transitions, scroll-aware navigation, and
+  visual refinements.
+- Added transient-error retries, manual retry actions, and clearer response and
+  network error states.
 
 ### 2026-07-31
 
-- Created this project manifest before dashboard development.
-- Recorded the product objective, initial scope, API context, technical direction,
-  security posture, proposed structure, open questions, and current inventory.
-- Recorded the decision to defer Docker and use a native deployment approach.
-- Marked the frontend stack and reverse-proxy architecture as proposed pending
-  explicit approval to begin implementation.
-- Installed Node.js LTS `24.18.1` natively; Docker remains unused.
-- Added the React 19, TypeScript, and Vite application scaffold and npm lockfile.
-- Added a configurable Vite `/api` proxy targeting the documented network API by default.
-- Added typed requests for health, files, file detail, production summary,
-  recovery, solution totals, reject-reason totals, and grade mix.
-- Added date-range controls defaulting to the local current date, an all-dates
-  action, API health status, loading/error/empty states, summary metrics, simple
-  data tables, a grade-mix chart, and file-detail inspection.
-- Added responsive styling with no third-party runtime assets.
-- Added API-client unit tests and native run/build/test instructions.
-- Verified unit tests, TypeScript compilation, the production build, the running
-  dashboard server, the live proxy health check, and live payload compatibility
-  for every collection endpoint used by the dashboard.
-- Diagnosed post-install `node`/`npm` command discovery: the persistent machine
-  PATH was correct, but terminals opened before installation retained a stale
-  environment. Confirmed that rebuilding PATH from Windows user and machine values
-  restores both commands without reinstalling Node.
+- Established the React, TypeScript, Vite, TanStack Query, Recharts, and plain-CSS
+  application foundation.
+- Defined the read-only local-dashboard objective and deferred Docker pending the
+  final deployment environment.
