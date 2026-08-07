@@ -141,3 +141,24 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local editor settings
+.idea/
+.vscode/
+*.suo
+*.user
+*.swp
+
+# Test and browser automation output
+src/test/results/
+playwright-report/
+blob-report/
+
+# Local scratch files
+*.tmp
+*.temp

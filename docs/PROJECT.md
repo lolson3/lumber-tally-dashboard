@@ -55,51 +55,33 @@ The first dashboard iteration is expected to include:
 
 ## API context
 
-The consolidated human-readable API reference is located at
-`Documentation/tallyapiexamples.md`. The source OpenAPI 3.1 document is located
-at `Documentation/tallyapi.json`, and the original API-page screenshots remain in
-the same directory.
+The current integration contract is documented in `Documentation/API.md`.
 
 ### Observed API details
 
 | Item | Value |
 |---|---|
-| Title | SFP Tally API |
-| Version | `0.1.0` |
-| Observed base URL | `http://192.168.203.238:8800` |
+| API | Bronze tally tables |
+| Base URL | Configured through `VITE_TALLY_API_BASE_URL` |
 | Media type | `application/json` |
 | Operations | Read-only `GET` requests |
-| Authentication | None declared in OpenAPI or shown in supplied screenshots |
-| Pagination | `limit` defaults to `1000`, maximum `5000`; `offset` defaults to `0` |
-| Date parameters | Optional `start` and `end` values with OpenAPI `date` format |
+| Pagination | `limit` and `offset`; observed response cap of 1,000 rows |
+| Filtering | Date filtering and dashboard aggregation occur in the client |
 
 ### Available endpoints
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /health` | API availability check |
-| `GET /files` | List report files |
-| `GET /files/{file_id}` | Retrieve one complete report |
-| `GET /production-summary` | Retrieve production metrics |
-| `GET /recovery` | Retrieve recovery metrics |
-| `GET /solutions` | Retrieve per-file solution rows or aggregated totals |
-| `GET /reject-reasons` | Retrieve per-file reject reasons or aggregated totals |
-| `GET /grade-mix` | Retrieve grouped grade/detail output |
+| `GET /api/bronze/tables` | Table names and row counts |
+| `GET /api/bronze/tally/files` | Report metadata |
+| `GET /api/bronze/tally/summary` | Production and recovery metrics |
+| `GET /api/bronze/tally/solutions` | Per-file solution rows |
+| `GET /api/bronze/tally/reject-reasons` | Per-file reject counts |
+| `GET /api/bronze/tally/detail-lines` | Board dimensions, pieces, and board feet |
 
-### API uncertainties that affect implementation
-
-- The OpenAPI document does not declare a server URL; the current address comes
-  from screenshots and must be configuration rather than hard-coded application logic.
-- The date field being filtered, date-bound inclusivity, and timezone are not documented.
-- Pagination ordering, total counts, and end-of-results behavior are not documented.
-- Valid `/grade-mix` `group_by` values other than the default `grade` are not documented.
-- Several timestamp and time fields are typed only as strings, with no exact format.
-- Rate limits and errors other than validation status `422` are not documented.
-- No API authentication or authorization mechanism is currently declared.
-
-Until clarified, the UI must avoid presenting assumptions about these semantics as
-facts. Any necessary implementation assumption must be documented in the decision
-log before it is introduced.
+The dashboard joins bronze resources on `file_id`, performs inclusive date
+filtering against `report_datetime`, and computes chart totals locally. These
+application semantics and the response envelope are recorded in the API document.
 
 ## Chosen technical direction
 
@@ -119,21 +101,19 @@ log before it is introduced.
 ### Hosting and API routing
 
 The production frontend will be compiled to static files and served by a local
-web server. The browser sends API requests directly to the configured Tally API
-origin (`http://192.168.203.238:8800` by default).
+web server. During development and preview, same-origin `/api` requests are
+forwarded to the origin configured by `VITE_TALLY_API_BASE_URL`.
 
 ```text
 Browser
    |-- dashboard assets -> local dashboard web server
-   `-- API requests     -> SFP Tally API at 192.168.203.238:8800
+   `-- /api requests    -> configured Bronze API origin
 ```
-
-The API must permit the dashboard origin through its CORS configuration.
 
 ### Local development
 
 During development and production, `VITE_TALLY_API_BASE_URL` configures the API
-origin. It defaults to `http://192.168.203.238:8800` in the application client.
+origin. Local environment files may provide the deployment-specific address.
 
 Node.js LTS is installed at `C:\Program Files\nodejs`. Its installer registered
 that directory in the Windows machine PATH. Terminals and editor processes that
@@ -311,9 +291,7 @@ src/
 | Path | Purpose | State |
 |---|---|---|
 | `PROJECT.md` | Decisions, architecture, project context, and change history | Active |
-| `Documentation/tallyapiexamples.md` | Consolidated API usage and schema reference | Active |
-| `Documentation/tallyapi.json` | Source OpenAPI 3.1 specification | Reference artifact |
-| `Documentation/Screenshot *.png` | Original API documentation screenshots | Reference artifacts |
+| `Documentation/API.md` | Current Bronze API integration contract | Active |
 | `package.json` / `package-lock.json` | Dependencies and native npm run/build/test commands | Active |
 | `vite.config.ts` | React build plus configurable `/api` proxy for development and preview | Active |
 | `.env.example` | Example upstream API target configuration | Active |
