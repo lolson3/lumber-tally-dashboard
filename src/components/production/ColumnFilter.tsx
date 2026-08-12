@@ -19,7 +19,7 @@ export function ColumnFilter<T>({ columns, hiddenColumns, onToggleColumn, onTogg
     {isOpen && createPortal(
       <div className="column-filter-menu column-filter-menu-portal" id="production-column-filter" ref={menuRef} style={position}>
         <button className="column-filter-toggle-all" type="button" onClick={onToggleAll}>{allOptionalVisible ? "Deselect All" : "Select All"}</button>
-        {columns.map((column) => <label key={column.key}><input type="checkbox" checked={!hiddenColumns.has(column.key)} disabled={column.key === "date"} onChange={() => onToggleColumn(column.key)} />{column.label}</label>)}
+        {columns.map((column) => <label key={column.key}><input type="checkbox" checked={!hiddenColumns.has(column.key)} onChange={() => onToggleColumn(column.key)} />{column.label}</label>)}
       </div>, document.body,
     )}
   </>;

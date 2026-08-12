@@ -6,14 +6,14 @@ export const plcOptions = [
 ] as const;
 export type PlcOption = (typeof plcOptions)[number];
 
-export const dashboardSections = ["data-selection", "summary", "mix-graphs", "solutions-rejects", "reports"] as const;
+export const dashboardSections = ["data-selection", "summary", "product-breakdown", "output&rejects", "reports"] as const;
 export type DashboardSection = (typeof dashboardSections)[number];
 
 export const dashboardSectionLabels: Record<DashboardSection, string> = {
   "data-selection": "Data Selection",
   summary: "Summary",
-  "mix-graphs": "Mix Graphs",
-  "solutions-rejects": "Solutions & Rejects",
+  "product-breakdown": "Product Breakdown",
+  "output&rejects": "Output & Rejects",
   reports: "Reports",
 };
 

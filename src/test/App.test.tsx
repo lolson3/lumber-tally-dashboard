@@ -27,7 +27,7 @@ function renderApp() {
 beforeEach(() => {
   api.health.mockResolvedValue({ status: "ok" });
   api.files.mockResolvedValue([report]);
-  api.productionSummary.mockResolvedValue([{ ...report, board_input_pieces: 10, board_input_cuft: 20, edger_bd_ft: 30, lumber_value: 40 }]);
+  api.productionSummary.mockResolvedValue([{ ...report, time_run: "01:30:00", board_input_pieces: 10, board_input_cuft: 20, edger_bd_ft: 30, lumber_value: 40 }]);
   api.recovery.mockResolvedValue([{ file_id: 7, report_datetime: report.report_datetime, recovery_bf_cf: 9.5 }]);
   api.solutionTotals.mockResolvedValue([{ solution_number: 1, total_board_count: 4 }]);
   api.rejectReasonTotals.mockResolvedValue([{ reason: "No Decision", total_count: 2 }]);
@@ -40,11 +40,43 @@ describe("dashboard workflows", () => {
   it("loads data, validates dates, filters columns, and switches visual mode", async () => {
     const user = userEvent.setup();
     renderApp();
-    expect(await screen.findByRole("table", { name: "Production Summary" })).toBeInTheDocument();
+    const productionTable = await screen.findByRole("table", { name: "Production Summary" });
     expect(screen.getAllByText("$40.00")).toHaveLength(2);
+    expect(screen.queryByRole("heading", { name: "Solution Totals" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reject Reasons" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Board feet by Grade bar chart")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Product Breakdown" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Piece count by product dimensions")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sort products")).toHaveValue("ascending");
+    expect(screen.getByRole("option", { name: "Board Size ➡" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Board Size ⬅" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Pieces ➡" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Pieces ⬅" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Pareto 80/20" })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Sort products"), "pareto");
+    expect(screen.getByLabelText("Sort products")).toHaveValue("pareto");
+    await user.selectOptions(screen.getByLabelText("Sort products"), "ascending");
+    await waitFor(() => expect(api.gradeMix).toHaveBeenCalledTimes(4));
+    const mixGrouping = screen.getByLabelText("Group grade mix by");
+    await user.selectOptions(mixGrouping, "width");
+    expect(api.gradeMix).toHaveBeenCalledTimes(4);
+    expect(mixGrouping.closest(".panel")?.querySelector(".loading-state")).toBeNull();
+    const daysCard = screen.getByText("Run Time").closest("article");
+    expect(daysCard?.querySelector("strong")).toHaveTextContent("0.5 hrs");
+    expect(screen.getByText("Total Output")).toBeInTheDocument();
+    expect(daysCard?.querySelector("span")).toHaveTextContent("1 day");
+    expect(productionTable.querySelectorAll("th")).toHaveLength(7);
+    expect(Array.from(productionTable.querySelectorAll("th"), (header) => header.textContent)).toEqual([
+      "Report date", "Run time", "Run time %", "Input pieces", "Edger bd ft", "Blank passes", "Lumber value",
+    ]);
+    expect(productionTable).toHaveTextContent("00:30:00");
+    expect(productionTable).toHaveTextContent("5.26%");
 
     const start = screen.getByLabelText(/Start date/i);
     const end = screen.getByLabelText(/End date/i);
+    await user.clear(start);
+    await user.type(start, "2026-07-15");
+    expect(end).toHaveValue("2026-07-15");
     await user.clear(start);
     await user.type(start, "2026-08-31");
     await user.clear(end);
@@ -53,14 +85,27 @@ describe("dashboard workflows", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Start date must be on or before end date");
 
     await user.click(screen.getByRole("button", { name: "Filter" }));
-    expect(screen.getByRole("button", { name: "Deselect All" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select All" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Run time")).toBeChecked();
+    expect(screen.getByLabelText("Run time %")).toBeChecked();
+    expect(screen.getByLabelText("Input pieces")).toBeChecked();
+    expect(screen.getByLabelText("Edger bd ft")).toBeChecked();
+    expect(screen.getByLabelText("Lumber value")).toBeChecked();
+    expect(screen.getByLabelText("Report date")).toBeChecked();
+    expect(screen.getByLabelText("Start time")).not.toBeChecked();
+    expect(screen.getByLabelText("Blank passes")).toBeChecked();
+    expect(screen.getByLabelText("Blank pass bd ft")).not.toBeChecked();
     await user.click(screen.getByLabelText("Input pieces"));
     expect(screen.queryByRole("columnheader", { name: "Input pieces" })).not.toBeInTheDocument();
     await user.click(document.body);
     await waitFor(() => expect(screen.queryByRole("button", { name: "Select All" })).not.toBeInTheDocument());
 
-    await user.click(screen.getByRole("button", { name: "Switch to visual view" }));
+    const viewToggle = screen.getByRole("button", { name: "Switch to boards view" });
+    await user.click(viewToggle);
+    expect(viewToggle).toHaveClass("show-boards");
+    expect(screen.getByText("Boards", { selector: ".selected" })).toBeInTheDocument();
     expect(await screen.findByLabelText("Relative board dimensions by width and length")).toBeInTheDocument();
+    expect(screen.getByText("100%", { selector: ".board-shape-percentage" })).toBeInTheDocument();
   });
 
   it("opens a complete report and its raw JSON, then returns to the list", async () => {

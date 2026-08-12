@@ -16,6 +16,11 @@ interface DataSelectionPanelProps {
 
 export function DataSelectionPanel(props: DataSelectionPanelProps) {
   const { draftRange, range, selectedPlc, invalidRange, isRefreshing, onDraftRangeChange, onPlcChange, onApply, onAllDates } = props;
+  const changeStartDate = (start: string) => {
+    const endWasLinked = !draftRange.end || draftRange.end === draftRange.start;
+    const endPrecedesStart = Boolean(start && draftRange.end && draftRange.end < start);
+    onDraftRangeChange({ start, end: endWasLinked || endPrecedesStart ? start : draftRange.end });
+  };
   return (
     <section className="filter-bar" aria-labelledby="date-filter-heading">
         <div><p className="eyebrow">Data selection</p><h2 id="date-filter-heading">Choose Report Dates</h2></div>
@@ -25,7 +30,7 @@ export function DataSelectionPanel(props: DataSelectionPanelProps) {
               {plcOptions.map((plc) => <option key={plc} value={plc} disabled={plc !== "Board Edger"}>{plc}</option>)}
             </select>
           </label>
-          <label>Start date<input className="window-input" type="date" value={draftRange.start} max={draftRange.end || undefined} onChange={(event) => onDraftRangeChange({ ...draftRange, start: event.target.value })} /></label>
+          <label>Start date<input className="window-input" type="date" value={draftRange.start} max={draftRange.end || undefined} onChange={(event) => changeStartDate(event.target.value)} /></label>
           <label>End date<input className="window-input" type="date" value={draftRange.end} min={draftRange.start || undefined} onChange={(event) => onDraftRangeChange({ ...draftRange, end: event.target.value })} /></label>
           <div className="date-actions">
             <button className="primary-button" type="submit" disabled={invalidRange}>Apply Dates</button>

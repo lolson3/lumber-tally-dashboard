@@ -1,8 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { buildBoardShapes, mergeProductionRecovery, sortMixRows, sumNullable } from "../utils/dashboardData";
+import { adjustedRuntimeHours, buildBoardShapes, buildProductBreakdown, countReportDays, formatRuntimeHours, mergeProductionRecovery, runtimeHours, runtimePercentage, sortMixRows, sumAdjustedRuntimeHours, sumNullable, sumRuntimeHours } from "../utils/dashboardData";
 import { tooltipCoordinates } from "../utils/tooltipPosition";
+import { evenChartTicks, thousandsFormatter } from "../utils/formatting";
 
 describe("dashboard calculations", () => {
+  it("formats chart-axis values in thousands", () => {
+    expect(thousandsFormatter(250_000)).toBe("250k");
+    expect(thousandsFormatter(750_000)).toBe("750k");
+    expect(thousandsFormatter(1_000_000)).toBe("1m");
+    expect(thousandsFormatter(1_500_000)).toBe("2m");
+    expect(thousandsFormatter(750)).toBe("750");
+    expect(evenChartTicks(812_970)).toEqual([0, 200_000, 400_000, 600_000, 800_000, 1_000_000]);
+  });
+
+  it("counts distinct report days and totals runtime durations", () => {
+    expect(countReportDays([
+      { file_id: 1, filename: "one", filename_date: "2026-08-01", report_datetime: "2026-08-01 08:00:00" },
+      { file_id: 2, filename: "two", filename_date: "2026-08-01", report_datetime: "2026-08-01 12:00:00" },
+      { file_id: 3, filename: "three", filename_date: "2026-08-02", report_datetime: "2026-08-02 08:00:00" },
+    ])).toBe(2);
+    expect(sumRuntimeHours([
+      "01:30:00", "2:15", "1 day, 00:15:00", "2 hrs 30 mins", "PT1H30M", 2, null, "invalid",
+    ])).toBe(34);
+    expect(runtimeHours("08:06:00")).toBeCloseTo(8.1);
+    expect(adjustedRuntimeHours("10:30:00")).toBe(9.5);
+    expect(adjustedRuntimeHours("00:30:00")).toBe(0);
+    expect(sumAdjustedRuntimeHours(["10:30:00", "08:00:00"])).toBe(16.5);
+    expect(runtimePercentage("11:30:00")).toBeCloseTo(110.526);
+    expect(formatRuntimeHours(adjustedRuntimeHours("08:45:30"))).toBe("07:45:30");
+  });
+
   it("sums nullable values without producing NaN", () => {
     expect(sumNullable([10, null, undefined, 2.5])).toBe(12.5);
     expect(sumNullable([])).toBe(0);
@@ -28,8 +55,23 @@ describe("dashboard calculations", () => {
       { width: null, length_ft: 6, total_pieces: 99, total_bd_ft: 99 },
     ]);
     expect(shapes).toHaveLength(2);
-    expect(shapes[0]).toMatchObject({ width: 4, lengthFt: 6 });
+    expect(shapes[0]).toMatchObject({ width: 4, lengthFt: 6, pieces: 4, boardFeet: 7 });
+    expect(shapes[0].percentage).toBeCloseTo(4 / 6 * 100);
     expect(shapes[0].breakdown).toHaveLength(2);
+  });
+
+  it("combines grades and thicknesses into width/length products and calculates piece percentages", () => {
+    const rows = [
+      { thickness: "3/4", width: 4, length_ft: 8, grade: "#2", total_pieces: 150, total_bd_ft: 300 },
+      { thickness: "1", width: 4, length_ft: 8, grade: "#3", total_pieces: 50, total_bd_ft: 100 },
+      { thickness: "1", width: 5, length_ft: 10, grade: "#2", total_pieces: 800, total_bd_ft: 1200 },
+    ];
+    const ascending = buildProductBreakdown(rows, "ascending");
+    expect(ascending).toHaveLength(2);
+    expect(ascending[0]).toMatchObject({ product: "4 in × 8 ft", pieces: 200, boardFeet: 400, percentage: 20 });
+    expect(buildProductBreakdown(rows, "descending").map((row) => row.width)).toEqual([5, 4]);
+    expect(buildProductBreakdown(rows, "most-pieces").map((row) => row.pieces)).toEqual([800, 200]);
+    expect(buildProductBreakdown(rows, "least-pieces").map((row) => row.pieces)).toEqual([200, 800]);
   });
 
   it("sorts mix chart dimensions and grades into natural ascending order", () => {

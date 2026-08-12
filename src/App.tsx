@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { tallyApi } from "./api/client";
 import type { DateRange, GradeMixGrouping } from "./api/types";
 import { MixChart } from "./components/charts/MixChart";
-import { SolutionsRejects } from "./components/charts/SolutionsRejects";
+import { RejectReasons } from "./components/charts/RejectReasons";
+import { ProductBreakdown } from "./components/charts/ProductBreakdown";
 import { DataSelectionHeader } from "./components/data-selection/DataSelectionHeader";
 import { DataSelectionPanel } from "./components/data-selection/DataSelectionPanel";
 import { MetricsOverview } from "./components/MetricsOverview";
@@ -12,7 +13,7 @@ import { ReportsPanel } from "./components/reports/ReportsPanel";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import type { PlcOption } from "./constants/dashboard";
 import { useScrollSpy } from "./hooks/useScrollSpy";
-import { buildBoardShapes, mergeProductionRecovery, sumNullable } from "./utils/dashboardData";
+import { buildBoardShapes, countReportDays, mergeProductionRecovery, sumAdjustedRuntimeHours, sumNullable } from "./utils/dashboardData";
 import { moneyFormatter, numberFormatter, todayRange } from "./utils/formatting";
 
 export function App() {
@@ -20,7 +21,7 @@ export function App() {
   const [range, setRange] = useState<DateRange>(todayRange);
   const [selectedPlc, setSelectedPlc] = useState<PlcOption>("Board Edger");
   const [gradeMixGrouping, setGradeMixGrouping] = useState<GradeMixGrouping>("grade");
-  const [productionView, setProductionView] = useState<"table" | "visual">("table");
+  const [productView, setProductView] = useState<"table" | "boards">("table");
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
   const { activeSection, selectSection } = useScrollSpy();
@@ -30,25 +31,38 @@ export function App() {
   const files = useQuery({ queryKey: ["files", selectedPlc, range], queryFn: ({ signal }) => tallyApi.files(range, signal) });
   const production = useQuery({ queryKey: ["production-summary", selectedPlc, range], queryFn: ({ signal }) => tallyApi.productionSummary(range, signal) });
   const recovery = useQuery({ queryKey: ["recovery", selectedPlc, range], queryFn: ({ signal }) => tallyApi.recovery(range, signal) });
-  const solutions = useQuery({ queryKey: ["solution-totals", selectedPlc, range], queryFn: ({ signal }) => tallyApi.solutionTotals(range, signal) });
   const rejects = useQuery({ queryKey: ["reject-reason-totals", selectedPlc, range], queryFn: ({ signal }) => tallyApi.rejectReasonTotals(range, signal) });
-  const gradeMix = useQuery({ queryKey: ["grade-mix", selectedPlc, gradeMixGrouping, range], queryFn: ({ signal }) => tallyApi.gradeMix(range, gradeMixGrouping, signal) });
-  const boardDimensionMix = useQuery({ queryKey: ["board-dimension-mix", selectedPlc, range], queryFn: ({ signal }) => tallyApi.boardDimensionMix(range, signal), enabled: productionView === "visual" });
+  const gradeMix = useQuery({
+    queryKey: ["grade-mixes", selectedPlc, range],
+    queryFn: async ({ signal }) => {
+      const groupings: GradeMixGrouping[] = ["grade", "width", "thickness", "length_ft"];
+      const entries = await Promise.all(groupings.map(async (grouping) =>
+        [grouping, await tallyApi.gradeMix(range, grouping, signal)] as const));
+      return Object.fromEntries(entries) as Record<GradeMixGrouping, Awaited<ReturnType<typeof tallyApi.gradeMix>>>;
+    },
+  });
+  const boardDimensionMix = useQuery({ queryKey: ["board-dimension-mix", selectedPlc, range], queryFn: ({ signal }) => tallyApi.boardDimensionMix(range, signal) });
   const fileDetail = useQuery({ queryKey: ["file-detail", selectedFileId], queryFn: ({ signal }) => tallyApi.file(selectedFileId!, signal), enabled: selectedFileId !== null });
 
   const metrics = useMemo(() => {
     const rows = production.data ?? [];
+    const days = countReportDays(files.data ?? []);
+    const runtimeHours = sumAdjustedRuntimeHours(rows.map((row) => row.time_run));
     return [
-      { label: "Reports", value: numberFormatter.format(files.data?.length ?? 0) },
+      {
+        label: "Run Time",
+        value: `${numberFormatter.format(runtimeHours)} hrs`,
+        unit: `${numberFormatter.format(days)} ${days === 1 ? "day" : "days"}`,
+      },
       { label: "Input Pieces", value: numberFormatter.format(sumNullable(rows.map((row) => row.board_input_pieces))) },
       { label: "Input Volume", value: numberFormatter.format(sumNullable(rows.map((row) => row.board_input_cuft))), unit: "cu ft" },
-      { label: "Edger Output", value: numberFormatter.format(sumNullable(rows.map((row) => row.edger_bd_ft))), unit: "bd ft" },
+      { label: "Total Output", value: numberFormatter.format(sumNullable(rows.map((row) => row.edger_bd_ft))), unit: "bd ft" },
       { label: "Projected Lumber Value", value: moneyFormatter.format(sumNullable(rows.map((row) => row.lumber_value))) },
     ];
   }, [files.data, production.data]);
   const productionRows = useMemo(() => mergeProductionRecovery(production.data ?? [], recovery.data ?? []), [production.data, recovery.data]);
   const boardShapes = useMemo(() => buildBoardShapes(boardDimensionMix.data ?? []), [boardDimensionMix.data]);
-  const isRefreshing = [files, production, recovery, solutions, rejects, gradeMix].some((query) => query.isFetching);
+  const isRefreshing = [files, production, recovery, rejects, gradeMix].some((query) => query.isFetching);
 
   const applyRange = (event: FormEvent) => {
     event.preventDefault();
@@ -81,16 +95,15 @@ export function App() {
         <MetricsOverview metrics={metrics} />
         <div className="dashboard-grid">
           <ProductionSummary
-            view={productionView} onViewChange={setProductionView} rows={productionRows} shapes={boardShapes}
+            rows={productionRows}
             tablePending={production.isPending || recovery.isPending} tableError={production.error ?? recovery.error}
-            visualPending={boardDimensionMix.isPending} visualError={boardDimensionMix.error}
-            onRetryTable={() => { void production.refetch(); void recovery.refetch(); }} onRetryVisual={() => { void boardDimensionMix.refetch(); }}
+            onRetryTable={() => { void production.refetch(); void recovery.refetch(); }}
           />
-          <MixChart grouping={gradeMixGrouping} onGroupingChange={setGradeMixGrouping} rows={gradeMix.data ?? []} isPending={gradeMix.isPending} error={gradeMix.error} onRetry={() => { void gradeMix.refetch(); }} />
-          <SolutionsRejects
-            solutions={solutions.data ?? []} solutionsPending={solutions.isPending} solutionsError={solutions.error} onRetrySolutions={() => { void solutions.refetch(); }}
-            rejects={rejects.data ?? []} rejectsPending={rejects.isPending} rejectsError={rejects.error} onRetryRejects={() => { void rejects.refetch(); }}
-          />
+          <ProductBreakdown shapes={boardShapes} view={productView} onViewChange={setProductView} isPending={boardDimensionMix.isPending} error={boardDimensionMix.error} onRetry={() => { void boardDimensionMix.refetch(); }} />
+          <section id="output&rejects" className="wide-panel paired-panel-row section-anchor">
+            <MixChart grouping={gradeMixGrouping} onGroupingChange={setGradeMixGrouping} rows={gradeMix.data?.[gradeMixGrouping] ?? []} isPending={gradeMix.isPending} error={gradeMix.error} onRetry={() => { void gradeMix.refetch(); }} />
+            <RejectReasons rows={rejects.data ?? []} isPending={rejects.isPending} error={rejects.error} onRetry={() => { void rejects.refetch(); }} />
+          </section>
           <ReportsPanel
             files={files.data ?? []} filesPending={files.isPending} filesError={files.error} onRetryFiles={() => { void files.refetch(); }}
             selectedFileId={selectedFileId} onSelectFile={setSelectedFileId} onBack={backToReports}

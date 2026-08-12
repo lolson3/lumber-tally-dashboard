@@ -31,15 +31,3 @@ export function positionTooltipAtCursor(
   );
   tooltip.style.transform = `translate(${x - origin.left}px, ${y - origin.top}px)`;
 }
-
-export function followChartTooltip(chart: HTMLDivElement | null, clientX: number, clientY: number) {
-  if (!chart) return;
-  const tooltip = chart.querySelector<HTMLElement>(".recharts-tooltip-wrapper");
-  positionTooltipAtCursor(tooltip, clientX, clientY, chart.getBoundingClientRect());
-  tooltip?.style.setProperty("opacity", "1", "important");
-}
-
-export function hideChartTooltip(chart: HTMLDivElement | null) {
-  chart?.querySelector<HTMLElement>(".recharts-tooltip-wrapper")
-    ?.style.setProperty("opacity", "0", "important");
-}

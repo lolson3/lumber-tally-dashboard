@@ -1,7 +1,7 @@
 # Lumber Tally Dashboard
 
 A responsive production dashboard for exploring lumber tally reports, operational
-summary metrics, board mix, solution totals, reject reasons, and complete source
+summary metrics, product output, board mix, reject reasons, and complete source
 reports.
 
 > **Project status:** Functional demo. The application is approaching
@@ -22,17 +22,18 @@ report mappings are available.
 
 ## Features
 
-- Date-range and all-date report selection
+- Date-range and all-date report selection, with the end date initially linked to the selected start date
 - PLC selection prepared for multiple production systems
-- Production overview cards for report count, input, output, and projected value
+- Production overview cards for adjusted run time/days, input, total output, and projected value
 - Horizontally scrollable production summary with a sticky report-date column
 - Configurable production columns with select-all and deselect-all controls
-- Table and proportional board-dimension visualizations
-- Board-foot charts grouped by grade, thickness, width, or length
+- Product breakdown by width and length with graph and proportional board views
+- Product piece counts, board feet, percentages, size/piece sorting, and Pareto 80/20 analysis
+- Board-foot charts grouped by grade, thickness, width, or length without interaction-time reloads
 - Naturally ordered chart categories, including fractions and numbered grades
-- Solution-total chart and reject-reason summary
+- Scrollable reject-reason summary
 - Complete report detail view with expandable raw JSON
-- Cursor-following, viewport-aware chart and board tooltips
+- Shared cursor-following, viewport-aware chart and board tooltips
 - Scroll-aware sidebar navigation with synchronized URL hashes
 - Responsive desktop, tablet, and mobile layouts
 - Loading, empty, retry, and network-error states

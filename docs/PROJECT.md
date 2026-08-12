@@ -19,7 +19,7 @@ belong in the [README](../README.md), while endpoint details belong in the
 | Deployment | Local/private-network static application; final host undecided |
 | Test coverage | Unit, component, API integration, accessibility, and Playwright workflows |
 | Containerization | Not used; native deployment remains preferred |
-| Last reviewed | 2026-08-07 |
+| Last reviewed | 2026-08-12 |
 
 The dashboard is suitable for demonstrations and stakeholder review. Production
 release still requires deployment hardening, an agreed security model,
@@ -29,7 +29,7 @@ monitoring, and live-environment acceptance testing.
 
 Provide production teams with an accessible, read-only view of lumber tally
 data. Users can select a reporting window, review operational summaries, inspect
-board-foot distributions and reject/solution totals, and open the complete data
+product output, board-foot distributions and reject totals, and open the complete data
 for an individual report.
 
 The application must remain useful on a private network without relying on
@@ -37,17 +37,24 @@ third-party runtime assets or public internet access.
 
 ## Implemented scope
 
-- Date-range and all-date report selection.
+- Date-range and all-date report selection. Until a distinct end date is chosen, changing the start date links the end date to it so the native end-date calendar opens in the same month.
 - PLC selection UI with Board Edger enabled and future PLCs represented.
-- Production metrics for report count, input pieces and volume, edger output,
-  and projected lumber value.
+- Production metrics for adjusted run time and distinct days, input pieces and
+  volume, total output, and projected lumber value.
+- Run time values subtract one hour of scheduled breaks per run block, floor at
+  zero, and compare against 9.5 available hours for an uncapped run-time percentage.
 - Production summary table with sticky date column and configurable columns.
-- Table and proportional board-dimension views.
-- Board-foot charts grouped by grade, thickness, width, or length.
+- Product breakdown aggregated once by width and length for both graph and
+  proportional board views, including pieces, board feet, and percentage.
+- Product sorting by board size or piece count in either direction, plus an
+  optional Pareto 80/20 view.
+- Board-foot charts grouped by grade, thickness, width, or length, with all
+  groupings loaded up front to avoid reloads during interaction.
 - Natural ordering for numeric dimensions, fractional thicknesses, and grades.
-- Solution-total bar chart and reject-reason table.
+- Scrollable reject-reason table; the redundant Solution Totals panel is removed.
 - Complete report view with expandable raw JSON.
-- Cursor-following, viewport-aware tooltips.
+- One shared cursor-following, viewport-aware tooltip implementation across
+  product, board-foot, and board visualizations.
 - Scroll-aware navigation with URL hash synchronization.
 - Responsive desktop, tablet, and mobile layouts.
 - Loading, empty, validation, retry, and network-error states.
@@ -128,7 +135,7 @@ routing and reverse-proxy behavior.
 src/
   api/                 Bronze client, response normalization, domain types
   components/
-    charts/             Board mix, solutions, and rejects
+    charts/             Product breakdown, board mix, shared tooltips, and rejects
     data-selection/     Page header, PLC, and date controls
     production/         Summary table, filters, and board visualization
     reports/            Report list and detail presentation
@@ -188,7 +195,7 @@ npm run test:all
 
 It currently runs:
 
-- 20 Vitest tests across API behavior, calculations, components, dashboard
+- 23 Vitest tests across API behavior, calculations, components, dashboard
   workflows, and accessibility.
 - TypeScript project compilation and a Vite production build.
 - Two Playwright workflows covering the primary desktop flow and mobile
@@ -300,6 +307,21 @@ verified as part of deployment acceptance.
 | `.github/workflows/test.yml` | Continuous verification pipeline |
 
 ## Recent milestones
+
+### 2026-08-12
+
+- Added adjusted run-time totals and uncapped utilization percentages based on
+  a 9.5-hour available-production window after scheduled breaks.
+- Updated the default production columns and terminology, including Blank Pass,
+  Total Output, report date, run time, and run-time percentage.
+- Added the width/length Product Breakdown graph and board view with shared
+  aggregates, responsive overflow, sorting, and optional Pareto 80/20 analysis.
+- Unified floating tooltips and preloaded every board-foot grouping to eliminate
+  interaction-time data reloads.
+- Reworked the dashboard sections to Summary, Product Breakdown, and Output &
+  Rejects, removing Solution Totals and restoring the board-foot panel position.
+- Linked the initial end date to the selected start date so both native calendar
+  controls begin in the same month.
 
 ### 2026-08-07
 
