@@ -42,6 +42,37 @@ test("keeps navigation usable at mobile width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await page.getByRole("button", { name: "All Dates" }).click();
+  const navigationLayout = await page.getByRole("navigation", { name: "Dashboard sections" }).evaluate((navigation) => ({
+    clientWidth: navigation.clientWidth,
+    scrollWidth: navigation.scrollWidth,
+    linkRows: new Set(Array.from(navigation.querySelectorAll("a"), (link) => link.getBoundingClientRect().top)).size,
+    lastRowCenterOffset: (() => {
+      const navigationBounds = navigation.getBoundingClientRect();
+      const links = Array.from(navigation.querySelectorAll("a"));
+      const lastTop = links.at(-1)?.getBoundingClientRect().top;
+      const lastRow = links.filter((link) => link.getBoundingClientRect().top === lastTop);
+      const left = lastRow[0].getBoundingClientRect().left;
+      const right = lastRow.at(-1)!.getBoundingClientRect().right;
+      return Math.abs((left + right) / 2 - (navigationBounds.left + navigationBounds.right) / 2);
+    })(),
+  }));
+  expect(navigationLayout.scrollWidth).toBeLessThanOrEqual(navigationLayout.clientWidth);
+  expect(navigationLayout.linkRows).toBeGreaterThan(1);
+  expect(navigationLayout.lastRowCenterOffset).toBeLessThan(1);
+  const brandCenterOffset = await page.locator(".brand span").evaluate((brand) => {
+    const brandBounds = brand.getBoundingClientRect();
+    const sidebarBounds = brand.closest(".sidebar")!.getBoundingClientRect();
+    return Math.abs((brandBounds.left + brandBounds.right) / 2 - (sidebarBounds.left + sidebarBounds.right) / 2);
+  });
+  expect(brandCenterOffset).toBeLessThan(1);
+
+  const gradeChart = page.getByLabel("Board feet by Grade bar chart");
+  await expect(gradeChart).toBeVisible();
+  const chartBounds = await gradeChart.boundingBox();
+  expect(chartBounds).not.toBeNull();
+  expect(chartBounds!.width).toBeGreaterThan(250);
+  expect(chartBounds!.height).toBeGreaterThanOrEqual(300);
+
   await page.getByRole("link", { name: "Reports" }).click();
   await expect(page).toHaveURL(/#reports$/);
   await expect(page.getByRole("table", { name: "Report files" })).toBeVisible();
@@ -52,6 +83,32 @@ test("labels the output and rejects section", async ({ page }) => {
   await expect(link).toHaveAttribute("href", "#output&rejects");
   await link.click();
   await expect(page).toHaveURL(/#output&rejects$/);
+});
+
+test("reuses unchanged Bronze tables from persistent storage on revisit", async ({ page }) => {
+  await page.getByRole("button", { name: "All Dates" }).click();
+  await expect(page.getByLabel("Board feet by Grade bar chart")).toBeVisible();
+  await expect.poll(() => page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("lumber-tally-dashboard", 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return new Promise<number>((resolve, reject) => {
+      const request = database.transaction("bronze-tables", "readonly").objectStore("bronze-tables").count();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  })).toBeGreaterThanOrEqual(4);
+
+  const tableRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/tally\/(files|summary|reject-reasons|detail-lines)/.test(request.url())) tableRequests.push(request.url());
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "All Dates" }).click();
+  await expect(page.getByRole("table", { name: "Production Summary" })).toBeVisible();
+  expect(tableRequests).toEqual([]);
 });
 
 test("publishes install metadata and activates its service worker", async ({ page, request }) => {

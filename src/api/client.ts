@@ -11,6 +11,7 @@ import type {
   SolutionTotalOut,
   SummaryOut,
 } from "./types";
+import { persistTable, readPersistedTable } from "./persistentTableCache";
 
 const API_ROOT = "/api/bronze";
 const PAGE_LIMIT = 1000;
@@ -101,21 +102,41 @@ function loadTableCounts(): Promise<Map<string, number>> {
   return tableCountsPromise;
 }
 
+async function fetchTableRows<T>(table: string, startOffset: number, rowCount: number): Promise<T[]> {
+  if (startOffset >= rowCount) return [];
+  const firstPage = await request<BronzePage<T>>(`/tally/${table}?limit=${PAGE_LIMIT}&offset=${startOffset}`);
+  if (!Array.isArray(firstPage.rows) || firstPage.rows.length === 0) throw new ResponseFormatError();
+  const effectivePageSize = firstPage.rows.length;
+  const remainingOffsets = Array.from(
+    { length: Math.ceil((rowCount - startOffset - effectivePageSize) / effectivePageSize) },
+    (_, page) => startOffset + effectivePageSize * (page + 1),
+  );
+  const remainingPages = await Promise.all(remainingOffsets.map((offset) =>
+    request<BronzePage<T>>(`/tally/${table}?limit=${PAGE_LIMIT}&offset=${offset}`),
+  ));
+  const pages = [firstPage, ...remainingPages];
+  if (pages.some((page) => !Array.isArray(page.rows))) throw new ResponseFormatError();
+  return pages.flatMap((page) => page.rows.map((row) => row.payload));
+}
+
 async function fetchTable<T>(table: string): Promise<T[]> {
   const counts = await loadTableCounts();
   const tableName = `tally__${table.replaceAll("-", "_")}`;
   const rowCount = counts.get(tableName);
   if (typeof rowCount !== "number") throw new ResponseFormatError();
 
-  const offsets = Array.from(
-    { length: Math.ceil(rowCount / PAGE_LIMIT) },
-    (_, page) => page * PAGE_LIMIT,
+  const persisted = await readPersistedTable<T>(table);
+  if (persisted && persisted.rowCount === rowCount && persisted.rows.length === rowCount) return persisted.rows;
+
+  const canAppend = Boolean(
+    persisted && persisted.rowCount < rowCount && persisted.rows.length === persisted.rowCount,
   );
-  const pages = await Promise.all(offsets.map((offset) =>
-    request<BronzePage<T>>(`/tally/${table}?limit=${PAGE_LIMIT}&offset=${offset}`),
-  ));
-  if (pages.some((page) => !Array.isArray(page.rows))) throw new ResponseFormatError();
-  return pages.flatMap((page) => page.rows.map((row) => row.payload));
+  const existingRows = canAppend ? persisted!.rows : [];
+  const newRows = await fetchTableRows<T>(table, existingRows.length, rowCount);
+  const rows = [...existingRows, ...newRows];
+  if (rows.length !== rowCount) throw new ResponseFormatError();
+  void persistTable({ table, rowCount, rows });
+  return rows;
 }
 
 const tableCache = new Map<string, { loadedAt: number; promise: Promise<unknown[]> }>();

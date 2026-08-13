@@ -13,8 +13,9 @@ import { ReportsPanel } from "./components/reports/ReportsPanel";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import type { PlcOption } from "./constants/dashboard";
 import { useScrollSpy } from "./hooks/useScrollSpy";
+import { reportDetailQueryOptions, useReportDetailPrefetch } from "./hooks/useReportDetailPrefetch";
 import { buildBoardShapes, countReportDays, latestReportDate, mergeProductionRecovery, sumAdjustedRuntimeHours, sumNullable } from "./utils/dashboardData";
-import { defaultReportRange, formatReportDate, moneyFormatter, numberFormatter } from "./utils/formatting";
+import { defaultReportRange, formatReportDate, moneyFormatter, numberFormatter, previousProductionDaysRange } from "./utils/formatting";
 
 export function App() {
   const [draftRange, setDraftRange] = useState<DateRange>(defaultReportRange);
@@ -43,7 +44,10 @@ export function App() {
     },
   });
   const boardDimensionMix = useQuery({ queryKey: ["board-dimension-mix", selectedPlc, range], queryFn: ({ signal }) => tallyApi.boardDimensionMix(range, signal) });
-  const fileDetail = useQuery({ queryKey: ["file-detail", selectedFileId], queryFn: ({ signal }) => tallyApi.file(selectedFileId!, signal), enabled: selectedFileId !== null });
+  const fileDetail = useQuery({ ...reportDetailQueryOptions(selectedFileId ?? 0), enabled: selectedFileId !== null });
+  const dashboardInitialLoadComplete = [production, recovery, rejects, gradeMix, boardDimensionMix]
+    .every((query) => !query.isPending);
+  useReportDetailPrefetch(availableFiles.data ?? [], dashboardInitialLoadComplete && availableFiles.isSuccess);
 
   const metrics = useMemo(() => {
     const rows = production.data ?? [];
@@ -81,6 +85,12 @@ export function App() {
     setRange(allDates);
     setSelectedFileId(null);
   };
+  const showPresetDays = (days: number) => {
+    const presetRange = previousProductionDaysRange(days);
+    setDraftRange(presetRange);
+    setRange(presetRange);
+    setSelectedFileId(null);
+  };
   const selectPlc = (plc: PlcOption) => {
     setSelectedPlc(plc);
     setSelectedFileId(null);
@@ -95,7 +105,7 @@ export function App() {
     <div className="dashboard-surface">
       <DataSelectionHeader />
       <main>
-        <DataSelectionPanel draftRange={draftRange} range={range} selectedPlc={selectedPlc} invalidRange={invalidRange} latestAvailableDate={latestAvailableDate} availabilityPending={availableFiles.isPending} availabilityError={availableFiles.isError} onDraftRangeChange={setDraftRange} onPlcChange={selectPlc} onApply={applyRange} onAllDates={showAllDates} />
+        <DataSelectionPanel draftRange={draftRange} range={range} selectedPlc={selectedPlc} invalidRange={invalidRange} latestAvailableDate={latestAvailableDate} availabilityPending={availableFiles.isPending} availabilityError={availableFiles.isError} onDraftRangeChange={setDraftRange} onPlcChange={selectPlc} onApply={applyRange} onAllDates={showAllDates} onPresetDays={showPresetDays} />
         <MetricsOverview metrics={metrics} />
         <div className="dashboard-grid">
           <ProductionSummary

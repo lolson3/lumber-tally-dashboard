@@ -22,7 +22,7 @@ report mappings are available.
 
 ## Features
 
-- Date-range and all-date report selection, defaulting to the prior Pacific production day and initially linking the end date to the selected start date
+- Independent date-range selection plus 7-, 30-, 90-, and all-date presets, defaulting to the prior Pacific production day
 - PLC selection prepared for multiple production systems
 - Production overview cards for adjusted run time/days, input, total output, and projected value
 - Horizontally scrollable production summary with a sticky report-date column
@@ -33,6 +33,7 @@ report mappings are available.
 - Naturally ordered chart categories, including fractions and numbered grades
 - Scrollable reject-reason summary
 - Complete report detail view with expandable raw JSON
+- Newest-first background prefetching for delay-free report detail navigation
 - Shared cursor-following, viewport-aware chart and board tooltips
 - Scroll-aware sidebar navigation with synchronized URL hashes
 - Responsive desktop, tablet, and mobile layouts

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { adjustedRuntimeHours, buildBoardShapes, buildProductBreakdown, countReportDays, formatRuntimeHours, latestReportDate, mergeProductionRecovery, runtimeHours, runtimePercentage, sortMixRows, sumAdjustedRuntimeHours, sumNullable, sumRuntimeHours } from "../utils/dashboardData";
 import { tooltipCoordinates } from "../utils/tooltipPosition";
-import { defaultReportRange, evenChartTicks, PRODUCTION_TIME_ZONE, thousandsFormatter } from "../utils/formatting";
+import { newestReportsFirst } from "../hooks/useReportDetailPrefetch";
+import { defaultReportRange, evenChartTicks, previousProductionDaysRange, PRODUCTION_TIME_ZONE, thousandsFormatter } from "../utils/formatting";
 
 describe("dashboard calculations", () => {
   it("defaults to the prior Pacific production day", () => {
@@ -13,6 +14,10 @@ describe("dashboard calculations", () => {
     expect(defaultReportRange(new Date("2026-01-01T07:30:00Z"))).toEqual({
       start: "2025-12-30",
       end: "2025-12-30",
+    });
+    expect(previousProductionDaysRange(7, new Date("2026-08-13T18:00:00Z"))).toEqual({
+      start: "2026-08-06",
+      end: "2026-08-12",
     });
   });
 
@@ -49,6 +54,14 @@ describe("dashboard calculations", () => {
       { report_datetime: "2026-08-10 12:00:00" },
     ])).toBe("2026-08-11");
     expect(latestReportDate([])).toBeNull();
+  });
+
+  it("orders background report prefetching from newest to oldest", () => {
+    expect(newestReportsFirst([
+      { file_id: 1, filename: "old", filename_date: "2026-08-01", report_datetime: "2026-08-01 12:00:00" },
+      { file_id: 3, filename: "newest", filename_date: "2026-08-11", report_datetime: "2026-08-11 12:00:00" },
+      { file_id: 2, filename: "middle", filename_date: "2026-08-05", report_datetime: "2026-08-05 12:00:00" },
+    ]).map((file) => file.file_id)).toEqual([3, 2, 1]);
   });
 
   it("sums nullable values without producing NaN", () => {

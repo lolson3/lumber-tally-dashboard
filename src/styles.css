@@ -59,6 +59,7 @@ input:focus, button:focus-visible { outline: 3px solid rgba(244,119,0,.35); outl
 .primary-button, .secondary-button { border-radius: 7px; min-height: 42px; padding: 8px 16px; font-weight: 700; border: 1px solid var(--forest); transition: opacity .15s ease; }
 .primary-button { background: var(--forest); color: white; }
 .secondary-button { background: transparent; color: var(--forest); }
+.date-preset-button { padding-inline: 12px; }
 .primary-button:not(:disabled):hover, .secondary-button:not(:disabled):hover { opacity: .72; }
 .filter-heading { align-self: start; }
 .filter-heading .data-availability { margin-top: 8px; }
@@ -203,10 +204,10 @@ pre { background: #fff0e3; border: 1px solid #f2d2bb; border-radius: 8px; color:
 @media (max-width: 720px) {
   .app-shell { display: block; }
   .sidebar { min-height: 0; height: auto; padding: 14px 12px; position: relative; }
-  .brand { padding: 0 4px 14px; }
+  .brand { justify-content: center; padding: 0 4px 14px; text-align: center; }
   .sidebar-tree-field { display: none; }
-  .sidebar nav { display: flex; gap: 4px; overflow-x: auto; }
-  .nav-link { padding: 9px 11px; white-space: nowrap; }
+  .sidebar nav { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; overflow: visible; width: 100%; }
+  .nav-link { flex: 0 1 calc((100% - 8px) / 3); min-width: 0; padding: 9px 8px; text-align: center; white-space: normal; }
   .page-header { min-height: 150px; width: min(100% - 24px, 1480px); padding: 32px 0 60px; }
   .page-header { align-items: flex-start; flex-direction: column; }
   main { width: min(100% - 24px, 1480px); }
@@ -217,6 +218,9 @@ pre { background: #fff0e3; border: 1px solid #f2d2bb; border-radius: 8px; color:
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .dashboard-grid { grid-template-columns: 1fr; }
   .paired-panel-row { grid-template-columns: 1fr; }
+  [id="output&rejects"] { height: auto; }
+  [id="output&rejects"] > .panel { height: auto; min-height: 420px; }
+  .mix-chart-panel .chart-wrap { min-height: 310px; }
   .wide-panel { grid-column: auto; }
 }
 

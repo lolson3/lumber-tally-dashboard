@@ -69,7 +69,7 @@ describe("tallyApi bronze adapter", () => {
     await expect(tallyApi.file(999)).rejects.toMatchObject({ status: 404 });
   });
 
-  it("requests every page concurrently from the advertised row count", async () => {
+  it("requests every advertised row in 1,000-row pages", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
       if (url.endsWith("/tables")) return json({ tables: [{ table_name: "tally__files", row_count: 1001 }] });
@@ -77,6 +77,7 @@ describe("tallyApi bronze adapter", () => {
       return page(offset === 0 ? Array.from({ length: 1000 }, (_, index) => ({ file_id: index + 1, report_datetime: "2026-08-01" })) : [{ file_id: 1001, report_datetime: "2026-08-01" }], offset);
     });
     await expect(tallyApi.files({ start: "", end: "" })).resolves.toHaveLength(1001);
+    expect(fetchMock).toHaveBeenCalledWith("/api/bronze/tally/files?limit=1000&offset=0", expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith("/api/bronze/tally/files?limit=1000&offset=1000", expect.any(Object));
   });
 

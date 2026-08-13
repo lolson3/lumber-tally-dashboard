@@ -40,6 +40,14 @@ export function defaultReportRange(referenceDate = new Date()): DateRange {
   return { start: previousDay, end: previousDay };
 }
 
+export function previousProductionDaysRange(days: number, referenceDate = new Date()): DateRange {
+  if (!Number.isInteger(days) || days < 1) throw new Error("Production day count must be a positive integer.");
+  const { end } = defaultReportRange(referenceDate);
+  const endDate = new Date(`${end}T00:00:00Z`);
+  const start = new Date(endDate.getTime() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+  return { start, end };
+}
+
 export function formatReportDate(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   return `${month}/${day}/${year}`;

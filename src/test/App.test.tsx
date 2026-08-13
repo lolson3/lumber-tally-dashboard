@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
+import { previousProductionDaysRange } from "../utils/formatting";
 
 const api = vi.hoisted(() => ({
   health: vi.fn(), files: vi.fn(), file: vi.fn(), productionSummary: vi.fn(), recovery: vi.fn(),
@@ -77,7 +78,14 @@ describe("dashboard workflows", () => {
     const end = screen.getByLabelText(/End date/i);
     await user.clear(start);
     await user.type(start, "2026-07-15");
-    expect(end).toHaveValue("2026-07-15");
+    expect(end).not.toHaveValue("2026-07-15");
+    expect(screen.getByRole("button", { name: "7 Days" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "30 Days" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "90 Days" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "7 Days" }));
+    const sevenDayRange = previousProductionDaysRange(7);
+    expect(start).toHaveValue(sevenDayRange.start);
+    expect(end).toHaveValue(sevenDayRange.end);
     await user.clear(start);
     await user.type(start, "2026-08-31");
     await user.clear(end);

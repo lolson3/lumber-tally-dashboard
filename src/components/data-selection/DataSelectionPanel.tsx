@@ -14,15 +14,11 @@ interface DataSelectionPanelProps {
   onPlcChange: (plc: PlcOption) => void;
   onApply: (event: FormEvent) => void;
   onAllDates: () => void;
+  onPresetDays: (days: number) => void;
 }
 
 export function DataSelectionPanel(props: DataSelectionPanelProps) {
-  const { draftRange, range, selectedPlc, invalidRange, latestAvailableDate, availabilityPending, availabilityError, onDraftRangeChange, onPlcChange, onApply, onAllDates } = props;
-  const changeStartDate = (start: string) => {
-    const endWasLinked = !draftRange.end || draftRange.end === draftRange.start;
-    const endPrecedesStart = Boolean(start && draftRange.end && draftRange.end < start);
-    onDraftRangeChange({ start, end: endWasLinked || endPrecedesStart ? start : draftRange.end });
-  };
+  const { draftRange, range, selectedPlc, invalidRange, latestAvailableDate, availabilityPending, availabilityError, onDraftRangeChange, onPlcChange, onApply, onAllDates, onPresetDays } = props;
   return (
     <section className="filter-bar" aria-labelledby="date-filter-heading">
         <div className="filter-heading">
@@ -39,11 +35,12 @@ export function DataSelectionPanel(props: DataSelectionPanelProps) {
               {plcOptions.map((plc) => <option key={plc} value={plc} disabled={plc !== "Board Edger"}>{plc}</option>)}
             </select>
           </label>
-          <label>Start date<input className="window-input" type="date" value={draftRange.start} max={draftRange.end || undefined} onChange={(event) => changeStartDate(event.target.value)} /></label>
+          <label>Start date<input className="window-input" type="date" value={draftRange.start} max={draftRange.end || undefined} onChange={(event) => onDraftRangeChange({ ...draftRange, start: event.target.value })} /></label>
           <label>End date<input className="window-input" type="date" value={draftRange.end} min={draftRange.start || undefined} onChange={(event) => onDraftRangeChange({ ...draftRange, end: event.target.value })} /></label>
           <div className="date-actions">
             <button className="primary-button" type="submit" disabled={invalidRange}>Apply Dates</button>
             <button className="secondary-button" type="button" onClick={onAllDates}>All Dates</button>
+            {[7, 30, 90].map((days) => <button className="secondary-button date-preset-button" type="button" key={days} onClick={() => onPresetDays(days)}>{days} Days</button>)}
           </div>
         </form>
         {invalidRange && <p className="validation-message" role="alert">Start date must be on or before end date.</p>}

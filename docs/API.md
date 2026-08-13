@@ -18,8 +18,10 @@ public production hostnames belong in this repository.
 | `GET /api/bronze/tally/reject-reasons` | Reject reason counts by `file_id`. |
 | `GET /api/bronze/tally/detail-lines` | Board dimensions, grade, pieces, and board feet by `file_id`. |
 
-Tally collection endpoints accept `limit` and `offset`. The observed service
-caps responses at 1,000 rows, even if a larger limit is supplied.
+Tally collection endpoints accept `limit` and `offset`. The dashboard requests
+1,000 rows per page, matching the current backend response cap. The client also
+uses the first page's actual size as the offset increment so pagination remains
+safe if a smaller page is returned.
 
 ```http
 GET /api/bronze/tally/files?limit=1000&offset=0
@@ -66,7 +68,11 @@ The API exposes source tables rather than dashboard-specific aggregates.
   `report_datetime`;
 - calculates solution, reject-reason, grade, and dimension totals locally;
 - fetches required pages concurrently and shares requests between panels; and
-- caches completed table reads for one minute.
+- caches completed table reads in memory for one minute;
+- persists the compact domain rows in IndexedDB; and
+- compares current table counts on a new visit, reusing unchanged tables and
+  requesting only appended offsets when rows have been added. A reduced or
+  inconsistent row count causes a safe full-table rebuild.
 
 The date field and inclusivity above are application behavior. The upstream API
 does not currently provide server-side date filtering.

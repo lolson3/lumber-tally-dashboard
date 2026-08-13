@@ -37,10 +37,10 @@ third-party runtime assets or public internet access.
 
 ## Implemented scope
 
-- Date-range and all-date report selection. The initial range is the previous
-  calendar day in `America/Los_Angeles` (Pacific time), matching end-of-day PLC
-  report delivery. Until a distinct end date is chosen, changing the start date
-  links the end date to it so the native end-date calendar opens in the same month.
+- Independent start/end date selection plus 7-, 30-, 90-, and all-date presets.
+  The initial range is the previous calendar day in `America/Los_Angeles`
+  (Pacific time), matching end-of-day PLC report delivery. Presets include
+  complete production days and end on the previous Pacific day.
 - PLC selection UI with Board Edger enabled and future PLCs represented.
 - Production metrics for adjusted run time and distinct days, input pieces and
   volume, total output, and projected lumber value.
@@ -56,6 +56,8 @@ third-party runtime assets or public internet access.
 - Natural ordering for numeric dimensions, fractional thicknesses, and grades.
 - Scrollable reject-reason table; the redundant Solution Totals panel is removed.
 - Complete report view with expandable raw JSON.
+- Newest-first, one-at-a-time background prefetching of complete report details
+  after the initial dashboard load, retained for the browser session.
 - One shared cursor-following, viewport-aware tooltip implementation across
   product, board-foot, and board visualizations.
 - Scroll-aware navigation with URL hash synchronization.
@@ -96,12 +98,14 @@ aggregates.
 The client therefore:
 
 1. Reads table row counts.
-2. Requests all required 1,000-row pages concurrently.
+2. Requests 1,000 rows per page and loads the remaining offsets concurrently.
 3. Unwraps row payloads.
 4. Joins resources using `file_id`.
 5. Applies inclusive date filtering to the date portion of `report_datetime`.
 6. Calculates chart and table aggregates locally.
 7. Shares in-flight reads and caches completed tables for one minute.
+8. Persists approximately 1.4 MB of compact Bronze domain payloads in IndexedDB,
+   using current table counts to fetch only appended rows on later visits.
 
 This approach reduced a measured full sequential load from approximately 52.5
 seconds to approximately 13 seconds on the observed network. Lightweight panels
