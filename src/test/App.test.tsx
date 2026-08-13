@@ -46,6 +46,7 @@ describe("dashboard workflows", () => {
     expect(screen.getByRole("heading", { name: "Reject Reasons" })).toBeInTheDocument();
     expect(screen.getByLabelText("Board feet by Grade bar chart")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Product Breakdown" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Last data: 8/1/2026");
     expect(screen.getByLabelText("Piece count by product dimensions")).toBeInTheDocument();
     expect(screen.getByLabelText("Sort products")).toHaveValue("ascending");
     expect(screen.getByRole("option", { name: "Board Size ➡" })).toBeInTheDocument();

@@ -37,7 +37,10 @@ third-party runtime assets or public internet access.
 
 ## Implemented scope
 
-- Date-range and all-date report selection. Until a distinct end date is chosen, changing the start date links the end date to it so the native end-date calendar opens in the same month.
+- Date-range and all-date report selection. The initial range is the previous
+  calendar day in `America/Los_Angeles` (Pacific time), matching end-of-day PLC
+  report delivery. Until a distinct end date is chosen, changing the start date
+  links the end date to it so the native end-date calendar opens in the same month.
 - PLC selection UI with Board Edger enabled and future PLCs represented.
 - Production metrics for adjusted run time and distinct days, input pieces and
   volume, total output, and projected lumber value.
@@ -168,6 +171,9 @@ Utilities own reusable calculations that do not depend on React.
 ## Configuration and deployment
 
 `VITE_TALLY_API_BASE_URL` identifies the upstream API origin for the Vite proxy.
+`VITE_DASHBOARD_PORT` selects the development and preview server port and
+defaults to `5173`; strict port binding prevents scheduled launches from moving
+silently to a different address.
 Deployment-specific values belong in ignored environment files or host
 configuration, not source control.
 
@@ -294,7 +300,7 @@ verified as part of deployment acceptance.
 | Will the dashboard and API share a host? | Determines firewall rules, proxy routing, and failure boundaries. |
 | Which users and devices may access the dashboard? | Determines authentication and authorization requirements. |
 | Is local HTTPS required? | Determines certificate issuance and client trust configuration. |
-| What are the authoritative timezone and date-bound semantics? | Required for production-grade filtering guarantees. |
+| Should report timestamps be displayed beyond their source calendar date? | The default range is defined in Pacific time; future timestamp displays may need explicit conversion rules. |
 | When will other PLC data contracts become available? | Determines how PLC-specific endpoints, types, and UI modules should be introduced. |
 | What data volume and ingestion rate are expected in production? | Determines whether client-side full-table processing remains viable. |
 | What availability, logging, monitoring, and support targets apply? | Determines operational readiness and incident response requirements. |

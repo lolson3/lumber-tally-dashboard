@@ -1,9 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { adjustedRuntimeHours, buildBoardShapes, buildProductBreakdown, countReportDays, formatRuntimeHours, mergeProductionRecovery, runtimeHours, runtimePercentage, sortMixRows, sumAdjustedRuntimeHours, sumNullable, sumRuntimeHours } from "../utils/dashboardData";
+import { adjustedRuntimeHours, buildBoardShapes, buildProductBreakdown, countReportDays, formatRuntimeHours, latestReportDate, mergeProductionRecovery, runtimeHours, runtimePercentage, sortMixRows, sumAdjustedRuntimeHours, sumNullable, sumRuntimeHours } from "../utils/dashboardData";
 import { tooltipCoordinates } from "../utils/tooltipPosition";
-import { evenChartTicks, thousandsFormatter } from "../utils/formatting";
+import { defaultReportRange, evenChartTicks, PRODUCTION_TIME_ZONE, thousandsFormatter } from "../utils/formatting";
 
 describe("dashboard calculations", () => {
+  it("defaults to the prior Pacific production day", () => {
+    expect(PRODUCTION_TIME_ZONE).toBe("America/Los_Angeles");
+    expect(defaultReportRange(new Date("2026-08-13T06:30:00Z"))).toEqual({
+      start: "2026-08-11",
+      end: "2026-08-11",
+    });
+    expect(defaultReportRange(new Date("2026-01-01T07:30:00Z"))).toEqual({
+      start: "2025-12-30",
+      end: "2025-12-30",
+    });
+  });
+
   it("formats chart-axis values in thousands", () => {
     expect(thousandsFormatter(250_000)).toBe("250k");
     expect(thousandsFormatter(750_000)).toBe("750k");
@@ -28,6 +40,15 @@ describe("dashboard calculations", () => {
     expect(sumAdjustedRuntimeHours(["10:30:00", "08:00:00"])).toBe(16.5);
     expect(runtimePercentage("11:30:00")).toBeCloseTo(110.526);
     expect(formatRuntimeHours(adjustedRuntimeHours("08:45:30"))).toBe("07:45:30");
+  });
+
+  it("finds the latest available report date", () => {
+    expect(latestReportDate([
+      { filename_date: "2026-08-09", report_datetime: "2026-08-09 12:00:00" },
+      { filename_date: "2026-08-11", report_datetime: "2026-08-11 12:00:00" },
+      { report_datetime: "2026-08-10 12:00:00" },
+    ])).toBe("2026-08-11");
+    expect(latestReportDate([])).toBeNull();
   });
 
   it("sums nullable values without producing NaN", () => {

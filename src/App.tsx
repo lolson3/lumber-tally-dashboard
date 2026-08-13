@@ -13,12 +13,12 @@ import { ReportsPanel } from "./components/reports/ReportsPanel";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import type { PlcOption } from "./constants/dashboard";
 import { useScrollSpy } from "./hooks/useScrollSpy";
-import { buildBoardShapes, countReportDays, mergeProductionRecovery, sumAdjustedRuntimeHours, sumNullable } from "./utils/dashboardData";
-import { moneyFormatter, numberFormatter, todayRange } from "./utils/formatting";
+import { buildBoardShapes, countReportDays, latestReportDate, mergeProductionRecovery, sumAdjustedRuntimeHours, sumNullable } from "./utils/dashboardData";
+import { defaultReportRange, formatReportDate, moneyFormatter, numberFormatter } from "./utils/formatting";
 
 export function App() {
-  const [draftRange, setDraftRange] = useState<DateRange>(todayRange);
-  const [range, setRange] = useState<DateRange>(todayRange);
+  const [draftRange, setDraftRange] = useState<DateRange>(defaultReportRange);
+  const [range, setRange] = useState<DateRange>(defaultReportRange);
   const [selectedPlc, setSelectedPlc] = useState<PlcOption>("Board Edger");
   const [gradeMixGrouping, setGradeMixGrouping] = useState<GradeMixGrouping>("grade");
   const [productView, setProductView] = useState<"table" | "boards">("table");
@@ -29,6 +29,7 @@ export function App() {
 
   useQuery({ queryKey: ["health"], queryFn: ({ signal }) => tallyApi.health(signal), refetchInterval: 60_000 });
   const files = useQuery({ queryKey: ["files", selectedPlc, range], queryFn: ({ signal }) => tallyApi.files(range, signal) });
+  const availableFiles = useQuery({ queryKey: ["available-files", selectedPlc], queryFn: ({ signal }) => tallyApi.files({ start: "", end: "" }, signal) });
   const production = useQuery({ queryKey: ["production-summary", selectedPlc, range], queryFn: ({ signal }) => tallyApi.productionSummary(range, signal) });
   const recovery = useQuery({ queryKey: ["recovery", selectedPlc, range], queryFn: ({ signal }) => tallyApi.recovery(range, signal) });
   const rejects = useQuery({ queryKey: ["reject-reason-totals", selectedPlc, range], queryFn: ({ signal }) => tallyApi.rejectReasonTotals(range, signal) });
@@ -62,6 +63,10 @@ export function App() {
   }, [files.data, production.data]);
   const productionRows = useMemo(() => mergeProductionRecovery(production.data ?? [], recovery.data ?? []), [production.data, recovery.data]);
   const boardShapes = useMemo(() => buildBoardShapes(boardDimensionMix.data ?? []), [boardDimensionMix.data]);
+  const latestAvailableDate = useMemo(() => {
+    const date = latestReportDate(availableFiles.data ?? []);
+    return date ? formatReportDate(date) : null;
+  }, [availableFiles.data]);
   const isRefreshing = [files, production, recovery, rejects, gradeMix].some((query) => query.isFetching);
 
   const applyRange = (event: FormEvent) => {
@@ -91,7 +96,7 @@ export function App() {
     <div className="dashboard-surface">
       <DataSelectionHeader />
       <main>
-        <DataSelectionPanel draftRange={draftRange} range={range} selectedPlc={selectedPlc} invalidRange={invalidRange} isRefreshing={isRefreshing} onDraftRangeChange={setDraftRange} onPlcChange={selectPlc} onApply={applyRange} onAllDates={showAllDates} />
+        <DataSelectionPanel draftRange={draftRange} range={range} selectedPlc={selectedPlc} invalidRange={invalidRange} isRefreshing={isRefreshing} latestAvailableDate={latestAvailableDate} availabilityPending={availableFiles.isPending} availabilityError={availableFiles.isError} onDraftRangeChange={setDraftRange} onPlcChange={selectPlc} onApply={applyRange} onAllDates={showAllDates} />
         <MetricsOverview metrics={metrics} />
         <div className="dashboard-grid">
           <ProductionSummary

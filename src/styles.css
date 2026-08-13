@@ -61,6 +61,11 @@ input:focus, button:focus-visible { outline: 3px solid rgba(244,119,0,.35); outl
 .secondary-button { background: transparent; color: var(--forest); }
 .primary-button:not(:disabled):hover, .secondary-button:not(:disabled):hover { opacity: .72; }
 .filter-note { grid-column: 2; color: var(--muted); margin: 0; font-size: .82rem; }
+.data-availability { align-items: center; display: inline-flex; font-weight: 650; gap: 5px; margin-left: 10px; white-space: nowrap; }
+.data-availability-dot { background: currentColor; border-radius: 50%; display: inline-block; height: 8px; width: 8px; }
+.data-availability.is-available { color: #267344; }
+.data-availability.is-unavailable { color: var(--danger); }
+.data-availability.is-pending { color: var(--muted); }
 .validation-message { grid-column: 2; margin: 0; color: var(--danger); font-size: .82rem; }
 
 .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }

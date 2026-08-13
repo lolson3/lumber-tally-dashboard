@@ -22,7 +22,7 @@ report mappings are available.
 
 ## Features
 
-- Date-range and all-date report selection, with the end date initially linked to the selected start date
+- Date-range and all-date report selection, defaulting to the prior Pacific production day and initially linking the end date to the selected start date
 - PLC selection prepared for multiple production systems
 - Production overview cards for adjusted run time/days, input, total output, and projected value
 - Horizontally scrollable production summary with a sticky report-date column
@@ -108,7 +108,12 @@ Set the upstream API origin in `.env.local`:
 
 ```dotenv
 VITE_TALLY_API_BASE_URL=http://tally-api-host:7304
+VITE_DASHBOARD_PORT=5173
 ```
+
+`VITE_DASHBOARD_PORT` controls both the development/start server and the preview
+server. It defaults to `5173` when omitted and must be an available port from 1
+through 65535.
 
 Environment files are ignored by Git. Do not commit credentials or private
 deployment addresses.
@@ -155,7 +160,7 @@ npm run preview
 ```
 
 The compiled static assets are written to `dist/`, and the preview server is
-available at `http://localhost:4173` by default. Vite preview is intended for
+available at `http://localhost:5173` by default. Vite preview is intended for
 build verification; a production deployment should use an appropriate static
 web server and reverse-proxy configuration.
 

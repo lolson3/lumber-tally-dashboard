@@ -1,6 +1,7 @@
 import type { DateRange } from "../api/types";
 
 export const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+export const PRODUCTION_TIME_ZONE = "America/Los_Angeles";
 const compactThousandsFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0, useGrouping: false });
 export const moneyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -25,9 +26,23 @@ export function evenChartTicks(maximum: number, intervalCount = 5) {
   return Array.from({ length: Math.round(axisMaximum / step) + 1 }, (_, index) => index * step);
 }
 
-export function todayRange(): DateRange {
-  const today = new Date().toLocaleDateString("en-CA");
-  return { start: today, end: today };
+export function defaultReportRange(referenceDate = new Date()): DateRange {
+  const dateParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PRODUCTION_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(referenceDate);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(dateParts.find((entry) => entry.type === type)?.value);
+  const pacificCalendarDate = Date.UTC(part("year"), part("month") - 1, part("day"));
+  const previousDay = new Date(pacificCalendarDate - 86_400_000).toISOString().slice(0, 10);
+  return { start: previousDay, end: previousDay };
+}
+
+export function formatReportDate(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${month}/${day}/${year}`;
 }
 
 export function displayValue(

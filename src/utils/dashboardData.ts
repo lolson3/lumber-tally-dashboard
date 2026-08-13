@@ -3,6 +3,13 @@ import { numberFormatter } from "./formatting";
 
 const naturalLabelCollator = new Intl.Collator("en-US", { numeric: true, sensitivity: "base" });
 
+export function latestReportDate(files: Array<{ filename_date?: string; report_datetime: string }>) {
+  return files.reduce<string | null>((latest, file) => {
+    const date = file.filename_date || file.report_datetime.slice(0, 10);
+    return date && (!latest || date > latest) ? date : latest;
+  }, null);
+}
+
 function numericLabelValue(value: string | number | null | undefined) {
   if (typeof value === "number") return value;
   if (typeof value !== "string") return null;

@@ -8,6 +8,9 @@ interface DataSelectionPanelProps {
   selectedPlc: PlcOption;
   invalidRange: boolean;
   isRefreshing: boolean;
+  latestAvailableDate: string | null;
+  availabilityPending: boolean;
+  availabilityError: boolean;
   onDraftRangeChange: (range: DateRange) => void;
   onPlcChange: (plc: PlcOption) => void;
   onApply: (event: FormEvent) => void;
@@ -15,7 +18,7 @@ interface DataSelectionPanelProps {
 }
 
 export function DataSelectionPanel(props: DataSelectionPanelProps) {
-  const { draftRange, range, selectedPlc, invalidRange, isRefreshing, onDraftRangeChange, onPlcChange, onApply, onAllDates } = props;
+  const { draftRange, range, selectedPlc, invalidRange, isRefreshing, latestAvailableDate, availabilityPending, availabilityError, onDraftRangeChange, onPlcChange, onApply, onAllDates } = props;
   const changeStartDate = (start: string) => {
     const endWasLinked = !draftRange.end || draftRange.end === draftRange.start;
     const endPrecedesStart = Boolean(start && draftRange.end && draftRange.end < start);
@@ -38,7 +41,14 @@ export function DataSelectionPanel(props: DataSelectionPanelProps) {
           </div>
         </form>
         {invalidRange && <p className="validation-message" role="alert">Start date must be on or before end date.</p>}
-        <p className="filter-note">Showing {range.start || "earliest available"} through {range.end || "latest available"}.{isRefreshing && <span aria-live="polite"> Refreshing…</span>}</p>
+        <p className="filter-note">
+          <span>Showing {range.start || "earliest available"} through {range.end || "latest available"}.</span>
+          <span className={`data-availability ${availabilityPending ? "is-pending" : latestAvailableDate && !availabilityError ? "is-available" : "is-unavailable"}`} role="status">
+            <span className="data-availability-dot" aria-hidden="true" />
+            {availabilityPending ? "Checking latest data…" : latestAvailableDate && !availabilityError ? `Last data: ${latestAvailableDate}` : "No data available"}
+          </span>
+          {isRefreshing && <span aria-live="polite"> Refreshing…</span>}
+        </p>
     </section>
   );
 }
