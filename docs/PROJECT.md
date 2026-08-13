@@ -59,6 +59,8 @@ third-party runtime assets or public internet access.
 - Responsive desktop, tablet, and mobile layouts.
 - Loading, empty, validation, retry, and network-error states.
 - Deterministic automated tests and CI verification.
+- Installable PWA metadata, cross-platform icons, and an offline application
+  shell that explicitly excludes live API data from caching.
 
 ## Current exclusions
 
@@ -118,6 +120,11 @@ The frontend is built as static assets. Vite provides the `/api` proxy during
 development and preview. A production web server must provide equivalent SPA
 routing and reverse-proxy behavior.
 
+The production entry point registers a same-origin service worker. It precaches
+the generated application shell and static assets, supplies an offline fallback,
+and bypasses `/api` so production records retain their normal live-data and
+error semantics. PWA installation from non-local devices requires trusted HTTPS.
+
 ### Frontend responsibilities
 
 - **React 19 and TypeScript:** interface and typed application boundaries.
@@ -147,6 +154,11 @@ src/
   App.tsx               Shared state, queries, derived models, page composition
   main.tsx              React and QueryClient bootstrap
   styles.css            Global responsive visual system
+public/
+  icons/                Platform and maskable installation icons
+  manifest.webmanifest  PWA identity, display, and launch metadata
+  offline.html          Offline navigation fallback
+  sw.js                 Static application-shell caching; API requests bypassed
 ```
 
 Component code owns distinct interface regions. Hooks own React state/effect
@@ -307,6 +319,14 @@ verified as part of deployment acceptance.
 | `.github/workflows/test.yml` | Continuous verification pipeline |
 
 ## Recent milestones
+
+### 2026-08-13
+
+- Added installable PWA support for desktop and mobile platforms with a web app
+  manifest, standard/maskable/Apple icons, and standalone display metadata.
+- Added production-only service-worker registration, application-shell caching,
+  offline navigation fallback, and an explicit no-cache policy for API traffic.
+- Documented the trusted-HTTPS requirement for installation on other LAN devices.
 
 ### 2026-08-12
 

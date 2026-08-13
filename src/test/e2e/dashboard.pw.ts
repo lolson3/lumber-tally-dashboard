@@ -54,6 +54,40 @@ test("labels the output and rejects section", async ({ page }) => {
   await expect(page).toHaveURL(/#output&rejects$/);
 });
 
+test("publishes install metadata and activates its service worker", async ({ page, request }) => {
+  const offlineErrors: string[] = [];
+  page.on("pageerror", (error) => offlineErrors.push(error.message));
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute("href", "/icons/apple-touch-icon.png");
+
+  const manifestResponse = await request.get("/manifest.webmanifest");
+  expect(manifestResponse.ok()).toBe(true);
+  const manifest = await manifestResponse.json();
+  expect(manifest).toMatchObject({
+    name: "Lumber Tally Dashboard",
+    display: "standalone",
+    start_url: "/",
+  });
+  expect(manifest.icons).toHaveLength(4);
+
+  const serviceWorkerScope = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    return registration.scope;
+  });
+  expect(serviceWorkerScope).toBe(new URL("/", page.url()).href);
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  const cachedUrls = await page.evaluate(async () => (await caches.open("lumber-tally-shell-v1")).keys().then((requests) => requests.map((request) => request.url)));
+  expect(cachedUrls.some((url) => /\/assets\/index-.*\.js$/.test(url))).toBe(true);
+  expect(cachedUrls.some((url) => /\/assets\/index-.*\.css$/.test(url))).toBe(true);
+
+  await page.context().setOffline(true);
+  await page.reload();
+  await expect(page).toHaveTitle("Lumber Tally Dashboard");
+  await page.waitForTimeout(500);
+  expect(offlineErrors).toEqual([]);
+  await expect(page.getByRole("heading", { name: "Choose Report Dates" })).toBeVisible();
+});
+
 test("shows chart tooltips above dashboard panels", async ({ page }) => {
   await page.getByRole("button", { name: "All Dates" }).click();
   const productBar = page.getByLabel("Piece count by product dimensions").locator(".recharts-bar-rectangle").first();

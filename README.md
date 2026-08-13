@@ -159,6 +159,27 @@ available at `http://localhost:4173` by default. Vite preview is intended for
 build verification; a production deployment should use an appropriate static
 web server and reverse-proxy configuration.
 
+## Installable app (PWA)
+
+The dashboard includes a web app manifest, platform-specific icons, and an
+application-shell service worker. Supported browsers can install it on Windows,
+macOS, Android, iOS, iPadOS, ChromeOS, and Linux, subject to each platform's
+browser support. The installed shell can launch without a connection, while
+live production data still requires access to the Bronze API. API responses are
+deliberately excluded from offline caches so operational data is never presented
+as current after becoming stale.
+
+Build and serve the application normally, then use the browser's **Install app**
+or **Add to Home Screen** action. Service workers require a secure context:
+`localhost` is accepted for local use, but access from other devices must be
+served through trusted HTTPS. For private-network deployment, place the running
+dashboard behind an HTTPS reverse proxy with SPA fallback and `/api` forwarding.
+
+The root [start.bat](start.bat) and [start.sh](start.sh) launchers are suitable
+for a scheduler or service manager, but they start Vite over HTTP. An HTTPS proxy
+is therefore still required for installation from phones, tablets, and other
+LAN devices.
+
 ## Project structure
 
 ```text
@@ -178,6 +199,11 @@ src/
   styles.css            Responsive visual system
 docs/
   API.md                Current API integration contract
+public/
+  icons/                Standard, maskable, and Apple installation icons
+  manifest.webmanifest  Cross-platform app identity and launch behavior
+  offline.html          Offline navigation fallback
+  sw.js                 Application-shell service worker
 ```
 
 ## Demo limitations and production considerations
