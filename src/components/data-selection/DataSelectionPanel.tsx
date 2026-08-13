@@ -7,7 +7,6 @@ interface DataSelectionPanelProps {
   range: DateRange;
   selectedPlc: PlcOption;
   invalidRange: boolean;
-  isRefreshing: boolean;
   latestAvailableDate: string | null;
   availabilityPending: boolean;
   availabilityError: boolean;
@@ -18,7 +17,7 @@ interface DataSelectionPanelProps {
 }
 
 export function DataSelectionPanel(props: DataSelectionPanelProps) {
-  const { draftRange, range, selectedPlc, invalidRange, isRefreshing, latestAvailableDate, availabilityPending, availabilityError, onDraftRangeChange, onPlcChange, onApply, onAllDates } = props;
+  const { draftRange, range, selectedPlc, invalidRange, latestAvailableDate, availabilityPending, availabilityError, onDraftRangeChange, onPlcChange, onApply, onAllDates } = props;
   const changeStartDate = (start: string) => {
     const endWasLinked = !draftRange.end || draftRange.end === draftRange.start;
     const endPrecedesStart = Boolean(start && draftRange.end && draftRange.end < start);
@@ -26,7 +25,14 @@ export function DataSelectionPanel(props: DataSelectionPanelProps) {
   };
   return (
     <section className="filter-bar" aria-labelledby="date-filter-heading">
-        <div><p className="eyebrow">Data selection</p><h2 id="date-filter-heading">Choose Report Dates</h2></div>
+        <div className="filter-heading">
+          <p className="eyebrow">Data selection</p>
+          <h2 id="date-filter-heading">Choose Report Dates</h2>
+          <span className={`data-availability ${availabilityPending ? "is-pending" : latestAvailableDate && !availabilityError ? "is-available" : "is-unavailable"}`} role="status">
+            <span className="data-availability-dot" aria-hidden="true" />
+            {availabilityPending ? "Checking latest data…" : latestAvailableDate && !availabilityError ? `Last data: ${latestAvailableDate}` : "No data available"}
+          </span>
+        </div>
         <form onSubmit={onApply}>
           <label className="plc-control" htmlFor="plc-select">PLC
             <select className="window-input" id="plc-select" value={selectedPlc} onChange={(event) => onPlcChange(event.target.value as PlcOption)}>
@@ -41,14 +47,7 @@ export function DataSelectionPanel(props: DataSelectionPanelProps) {
           </div>
         </form>
         {invalidRange && <p className="validation-message" role="alert">Start date must be on or before end date.</p>}
-        <p className="filter-note">
-          <span>Showing {range.start || "earliest available"} through {range.end || "latest available"}.</span>
-          <span className={`data-availability ${availabilityPending ? "is-pending" : latestAvailableDate && !availabilityError ? "is-available" : "is-unavailable"}`} role="status">
-            <span className="data-availability-dot" aria-hidden="true" />
-            {availabilityPending ? "Checking latest data…" : latestAvailableDate && !availabilityError ? `Last data: ${latestAvailableDate}` : "No data available"}
-          </span>
-          {isRefreshing && <span aria-live="polite"> Refreshing…</span>}
-        </p>
+        <p className="filter-note">Showing {range.start || "earliest available"} through {range.end || "latest available"}.</p>
     </section>
   );
 }

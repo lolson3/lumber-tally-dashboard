@@ -174,6 +174,8 @@ Utilities own reusable calculations that do not depend on React.
 `VITE_DASHBOARD_PORT` selects the development and preview server port and
 defaults to `5173`; strict port binding prevents scheduled launches from moving
 silently to a different address.
+`VITE_ALLOWED_HOSTS` supplies a comma-separated allowlist for DNS and
+reverse-proxy hostnames, including `tally.biztechro.com` by default.
 Deployment-specific values belong in ignored environment files or host
 configuration, not source control.
 

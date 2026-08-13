@@ -67,7 +67,6 @@ export function App() {
     const date = latestReportDate(availableFiles.data ?? []);
     return date ? formatReportDate(date) : null;
   }, [availableFiles.data]);
-  const isRefreshing = [files, production, recovery, rejects, gradeMix].some((query) => query.isFetching);
 
   const applyRange = (event: FormEvent) => {
     event.preventDefault();
@@ -96,7 +95,7 @@ export function App() {
     <div className="dashboard-surface">
       <DataSelectionHeader />
       <main>
-        <DataSelectionPanel draftRange={draftRange} range={range} selectedPlc={selectedPlc} invalidRange={invalidRange} isRefreshing={isRefreshing} latestAvailableDate={latestAvailableDate} availabilityPending={availableFiles.isPending} availabilityError={availableFiles.isError} onDraftRangeChange={setDraftRange} onPlcChange={selectPlc} onApply={applyRange} onAllDates={showAllDates} />
+        <DataSelectionPanel draftRange={draftRange} range={range} selectedPlc={selectedPlc} invalidRange={invalidRange} latestAvailableDate={latestAvailableDate} availabilityPending={availableFiles.isPending} availabilityError={availableFiles.isError} onDraftRangeChange={setDraftRange} onPlcChange={selectPlc} onApply={applyRange} onAllDates={showAllDates} />
         <MetricsOverview metrics={metrics} />
         <div className="dashboard-grid">
           <ProductionSummary

@@ -109,11 +109,16 @@ Set the upstream API origin in `.env.local`:
 ```dotenv
 VITE_TALLY_API_BASE_URL=http://tally-api-host:7304
 VITE_DASHBOARD_PORT=5173
+VITE_ALLOWED_HOSTS=tally.biztechro.com
 ```
 
 `VITE_DASHBOARD_PORT` controls both the development/start server and the preview
 server. It defaults to `5173` when omitted and must be an available port from 1
 through 65535.
+
+`VITE_ALLOWED_HOSTS` is a comma-separated list of hostnames permitted to access
+the Vite server. Add each reverse-proxy or DNS hostname without a protocol or
+port, for example `tally.biztechro.com,dashboard.internal.example`.
 
 Environment files are ignored by Git. Do not commit credentials or private
 deployment addresses.
