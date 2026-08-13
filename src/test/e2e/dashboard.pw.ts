@@ -171,3 +171,14 @@ test("shows chart tooltips above dashboard panels", async ({ page }) => {
   await expect(boardTooltip).toBeVisible();
   await expect(boardTooltip).toContainText("Grade 2");
 });
+
+test("dismisses touch tooltips when mobile scrolling begins", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "All Dates" }).click();
+  await page.getByRole("button", { name: "Switch to boards view" }).click();
+  const board = page.locator(".board-shape").first();
+  await board.dispatchEvent("pointerdown", { pointerType: "touch", clientX: 180, clientY: 300 });
+  await expect(page.locator("body > .floating-chart-tooltip")).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new TouchEvent("touchmove", { bubbles: true })));
+  await expect(page.locator("body > .floating-chart-tooltip")).toHaveCount(0);
+});
