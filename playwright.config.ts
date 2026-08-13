@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const testServerUrl = "http://127.0.0.1:4173";
+
 export default defineConfig({
   testDir: "./src/test/e2e",
   testMatch: "**/*.pw.ts",
@@ -9,14 +11,14 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: testServerUrl,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
+    command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
+    url: testServerUrl,
+    reuseExistingServer: false,
   },
 });
