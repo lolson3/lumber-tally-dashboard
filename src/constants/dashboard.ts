@@ -1,10 +1,8 @@
 import type { GradeMixGrouping } from "../api/types";
+import { allPlcs, type PlcOption } from "../config/mills";
 
-export const plcOptions = [
-  "Board Edger", "Chopsaw", "Twin", "BakerInFeed", "Single", "Gang",
-  "Swede", "Trimmer", "Debarker", "Baker", "Quad",
-] as const;
-export type PlcOption = (typeof plcOptions)[number];
+export const plcOptions = allPlcs;
+export type { PlcOption };
 
 export const dashboardSections = ["data-selection", "summary", "product-breakdown", "output&rejects", "reports"] as const;
 export type DashboardSection = (typeof dashboardSections)[number];

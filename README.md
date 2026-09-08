@@ -72,8 +72,9 @@ payloads, joins records by `file_id`, applies the selected date range, and
 calculates chart totals locally. Table requests are shared between panels and
 cached briefly to avoid redundant network traffic.
 
-See [the API integration reference](docs/API.md) for the current endpoints,
-response envelope, and application assumptions.
+See the [Sequoia API reference](docs/SFP_API.md) and [North Fork API
+reference](docs/NFL_API.md) for mill-specific endpoints, response envelopes,
+and application assumptions.
 
 ## Getting started
 
@@ -109,6 +110,7 @@ Set the upstream API origin in `.env.local`:
 
 ```dotenv
 VITE_TALLY_API_BASE_URL=http://tally-api-host:7304
+VITE_MILL_ID=sequoia
 VITE_DASHBOARD_PORT=5173
 VITE_ALLOWED_HOSTS=tally.biztechro.com
 ```
@@ -116,6 +118,12 @@ VITE_ALLOWED_HOSTS=tally.biztechro.com
 `VITE_DASHBOARD_PORT` controls both the development/start server and the preview
 server. It defaults to `5173` when omitted and must be an available port from 1
 through 65535.
+
+`VITE_MILL_ID` selects a typed branding and operational profile. Available
+profiles are `sequoia` and `north-fork`. Profiles control the company name,
+dashboard name, theme colors, icons, timezone, enabled PLCs, default API origin,
+and generated PWA manifest. `VITE_TALLY_API_BASE_URL` can override the selected
+profile's default API for a particular deployment.
 
 `VITE_ALLOWED_HOSTS` is a comma-separated list of hostnames permitted to access
 the Vite server. Add each reverse-proxy or DNS hostname without a protocol or
@@ -209,7 +217,8 @@ src/
   main.tsx              React and TanStack Query bootstrap
   styles.css            Responsive visual system
 docs/
-  API.md                Current API integration contract
+  SFP_API.md            Sequoia Forest Products API integration contract
+  NFL_API.md            North Fork Lumber API integration contract
 public/
   icons/                Standard, maskable, and Apple installation icons
   manifest.webmanifest  Cross-platform app identity and launch behavior

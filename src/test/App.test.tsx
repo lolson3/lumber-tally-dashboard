@@ -50,10 +50,10 @@ describe("dashboard workflows", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Last data: 8/1/2026");
     expect(screen.getByLabelText("Piece count by product dimensions")).toBeInTheDocument();
     expect(screen.getByLabelText("Sort products")).toHaveValue("ascending");
-    expect(screen.getByRole("option", { name: "Board Size ➡" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Board Size ⬅" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Pieces ➡" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Pieces ⬅" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Board Size →" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Board Size ←" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Pieces →" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Pieces ←" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Pareto 80/20" })).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Sort products"), "pareto");
     expect(screen.getByLabelText("Sort products")).toHaveValue("pareto");
@@ -112,6 +112,7 @@ describe("dashboard workflows", () => {
     const viewToggle = screen.getByRole("button", { name: "Switch to boards view" });
     await user.click(viewToggle);
     expect(viewToggle).toHaveClass("show-boards");
+    expect(screen.getByLabelText("Sort products")).toBeDisabled();
     expect(screen.getByText("Boards", { selector: ".selected" })).toBeInTheDocument();
     expect(await screen.findByLabelText("Relative board dimensions by width and length")).toBeInTheDocument();
     expect(screen.getByText("100%", { selector: ".board-shape-percentage" })).toBeInTheDocument();

@@ -45,18 +45,16 @@ export function ProductBreakdown({ shapes, view, onViewChange, isPending, error,
   const maximumPieces = Math.max(1, ...products.map((product) => product.pieces));
   const yAxisTicks = useMemo(() => evenChartTicks(maximumPieces), [maximumPieces]);
   const yAxisMaximum = yAxisTicks[yAxisTicks.length - 1];
-  const action = <div className="summary-actions">
-    {view === "table" && <>
-      <label className="product-sort-control">Sort
-      <select aria-label="Sort products" value={sortDirection} onChange={(event) => setSortDirection(event.target.value as ProductBreakdownSort)}>
-        <option value="ascending">Board Size ➡</option>
-        <option value="descending">Board Size ⬅</option>
-        <option value="least-pieces">Pieces ➡</option>
-        <option value="most-pieces">Pieces ⬅</option>
+  const action = <div className="summary-actions product-breakdown-actions">
+      <label className={`product-sort-control ${view === "boards" ? "is-disabled" : ""}`}>Sort
+      <select aria-label="Sort products" value={sortDirection} disabled={view === "boards"} onChange={(event) => setSortDirection(event.target.value as ProductBreakdownSort)}>
+        <option value="ascending">Board Size →</option>
+        <option value="descending">Board Size ←</option>
+        <option value="least-pieces">Pieces →</option>
+        <option value="most-pieces">Pieces ←</option>
         <option value="pareto">Pareto 80/20</option>
       </select>
       </label>
-    </>}
     <button className={`summary-view-toggle ${view === "boards" ? "show-boards" : ""}`} type="button" aria-pressed={view === "boards"} aria-label={`Switch to ${view === "table" ? "boards" : "bar graph"} view`} onClick={() => onViewChange(view === "table" ? "boards" : "table")}>
       <span className={view === "table" ? "selected" : ""}>Graph</span><span className={view === "boards" ? "selected" : ""}>Boards</span><span className="summary-view-toggle-thumb" aria-hidden="true" />
     </button>
@@ -81,8 +79,8 @@ export function ProductBreakdown({ shapes, view, onViewChange, isPending, error,
                   return [`${numberFormatter.format(product.pieces)} pieces · ${numberFormatter.format(product.boardFeet)} board feet`, `${numberFormatter.format(product.percentage)}%`];
                 }}
               />
-              <Bar yAxisId="pieces" dataKey="pieces" fill="#f5a623" maxBarSize={38} radius={[5, 5, 0, 0]} animationDuration={450}>
-                {products.map((product) => <Cell key={`${product.width}-${product.lengthFt}`} fill={!paretoView || product.cumulativePercentage - product.percentage < 80 ? "#f5a623" : "#e2c7b2"} />)}
+              <Bar yAxisId="pieces" dataKey="pieces" fill="var(--amber)" maxBarSize={38} radius={[5, 5, 0, 0]} animationDuration={450}>
+                {products.map((product) => <Cell key={`${product.width}-${product.lengthFt}`} fill={!paretoView || product.cumulativePercentage - product.percentage < 80 ? "var(--amber)" : "color-mix(in srgb, var(--amber) 35%, white)"} />)}
               </Bar>
               {paretoView && <>
                 <ReferenceLine yAxisId="percentage" y={80} stroke="#c84f00" strokeDasharray="6 4" label={{ value: "80%", position: "insideTopRight", fill: "#c84f00" }} />

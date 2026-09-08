@@ -90,7 +90,7 @@ test("reuses unchanged Bronze tables from persistent storage on revisit", async 
   await expect(page.getByLabel("Board feet by Grade bar chart")).toBeVisible();
   await expect.poll(() => page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("lumber-tally-dashboard", 1);
+      const request = indexedDB.open("lumber-tally-dashboard-sequoia", 1);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

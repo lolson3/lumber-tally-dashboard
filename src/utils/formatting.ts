@@ -1,7 +1,8 @@
 import type { DateRange } from "../api/types";
+import { currentMill } from "../config/currentMill";
 
 export const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
-export const PRODUCTION_TIME_ZONE = "America/Los_Angeles";
+export const PRODUCTION_TIME_ZONE = currentMill.timeZone;
 const compactThousandsFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0, useGrouping: false });
 export const moneyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",

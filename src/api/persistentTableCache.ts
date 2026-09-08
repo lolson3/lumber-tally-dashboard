@@ -1,4 +1,6 @@
-const DATABASE_NAME = "lumber-tally-dashboard";
+import { currentMill } from "../config/currentMill";
+
+const DATABASE_NAME = `lumber-tally-dashboard-${currentMill.id}`;
 const DATABASE_VERSION = 1;
 const TABLE_STORE = "bronze-tables";
 

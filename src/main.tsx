@@ -5,6 +5,9 @@ import { App } from "./App";
 import { ApiError, NetworkError } from "./api/client";
 import "./styles.css";
 import { registerServiceWorker } from "./pwa/registerServiceWorker";
+import { applyMillProfile } from "./config/currentMill";
+
+applyMillProfile();
 
 const queryClient = new QueryClient({
   defaultOptions: {

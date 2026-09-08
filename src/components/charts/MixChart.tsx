@@ -29,7 +29,7 @@ export function MixChart({ grouping, onGroupingChange, rows, isPending, error, o
         <ResponsiveContainer width="100%" height="100%"><BarChart data={sortedRows} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey={grouping} tickLine={false} /><YAxis tickLine={false} tickFormatter={(value) => thousandsFormatter(Number(value))} width={72} />
           <FloatingChartTooltip formatter={(value) => [numberFormatter.format(Number(value)), "Board feet"]} />
-          <Bar dataKey="total_bd_ft" fill="#f5a623" radius={[5, 5, 0, 0]} />
+          <Bar dataKey="total_bd_ft" fill="var(--amber)" radius={[5, 5, 0, 0]} />
         </BarChart></ResponsiveContainer>
       </div>
     ) : <p className="empty-state">No grade-mix data was returned for these dates.</p>}</QueryState>

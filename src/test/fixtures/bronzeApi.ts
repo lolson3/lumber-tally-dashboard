@@ -29,7 +29,9 @@ export async function mockBronzeApi(page: Page) {
       })) });
       return;
     }
-    const resource = Object.keys(resources).find((name) => url.pathname.endsWith(`/tally/${name}`));
+    const resource = Object.keys(resources).find((name) => (
+      url.pathname.endsWith(`/tally/${name}`) || url.pathname.endsWith(`/tally/${name.replaceAll("-", "_")}`)
+    ));
     if (!resource) throw new Error(`Unhandled API route: ${url.pathname}`);
     const offset = Number(url.searchParams.get("offset") ?? 0);
     const limit = Number(url.searchParams.get("limit") ?? 1000);

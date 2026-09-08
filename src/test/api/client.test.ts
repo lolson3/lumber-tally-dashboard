@@ -24,13 +24,13 @@ function installFixtureApi() {
     const url = String(input);
     if (url.endsWith("/tables")) return json(tableCounts);
     if (url.includes("/files?")) return page([
-      { file_id: 2, filename: "new.txt", filename_date: "2026-08-02", report_datetime: "2026-08-02 12:00:00" },
+      { File_id: 2, filename: "new.txt", filename_date: "2026-08-02", report_datetime: "2026-08-02 12:00:00" },
       { file_id: 1, filename: "old.txt", filename_date: "2026-07-01", report_datetime: "2026-07-01 12:00:00" },
     ]);
     if (url.includes("/summary?")) return page([{ file_id: 2, board_input_pieces: 20, recovery_bf_cf: 9.5 }, { file_id: 1, board_input_pieces: 10 }]);
     if (url.includes("/solutions?")) return page([{ file_id: 2, solution_number: 1, board_count: 8 }, { file_id: 2, solution_number: 1, board_count: 7 }, { file_id: 1, solution_number: 1, board_count: 5 }]);
-    if (url.includes("/reject-reasons?")) return page([{ file_id: 2, reason: "No Decision", count: 4 }]);
-    if (url.includes("/detail-lines?")) return page([
+    if (/\/reject(?:-|_)reasons\?/.test(url)) return page([{ File_id: 2, reason: "No Decision", count: 4 }]);
+    if (/\/detail(?:-|_)lines\?/.test(url)) return page([
       { file_id: 2, wood_type: "RdWd", thickness: "5/8", width: 4, grade: "#2", length_ft: 6, pieces: 3, bd_ft: 9 },
       { file_id: 2, wood_type: "RdWd", thickness: "5/8", width: 4, grade: "#3", length_ft: 6, pieces: 1, bd_ft: 2 },
     ]);

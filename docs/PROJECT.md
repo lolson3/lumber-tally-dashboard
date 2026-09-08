@@ -6,7 +6,7 @@ This document records the current product scope, architecture, technical
 decisions, operational constraints, and unresolved production questions. It is
 the durable engineering record for the project; setup and presentation material
 belong in the [README](../README.md), while endpoint details belong in the
-[API integration reference](API.md).
+[Sequoia](SFP_API.md) and [North Fork](NFL_API.md) API references.
 
 ## Current status
 
@@ -80,7 +80,9 @@ third-party runtime assets or public internet access.
 
 ## API integration
 
-The dashboard uses the current Bronze API described in [API.md](API.md).
+The Sequoia profile uses the current Bronze API described in
+[SFP_API.md](SFP_API.md). North Fork's developing contract is tracked in
+[NFL_API.md](NFL_API.md).
 
 | Resource | Purpose |
 |---|---|
@@ -105,7 +107,8 @@ The client therefore:
 6. Calculates chart and table aggregates locally.
 7. Shares in-flight reads and caches completed tables for one minute.
 8. Persists approximately 1.4 MB of compact Bronze domain payloads in IndexedDB,
-   using current table counts to fetch only appended rows on later visits.
+   namespaced by mill profile, using current table counts to fetch only appended
+   rows on later visits.
 
 This approach reduced a measured full sequential load from approximately 52.5
 seconds to approximately 13 seconds on the observed network. Lightweight panels
@@ -174,7 +177,11 @@ Utilities own reusable calculations that do not depend on React.
 
 ## Configuration and deployment
 
-`VITE_TALLY_API_BASE_URL` identifies the upstream API origin for the Vite proxy.
+Each mill profile supplies a default upstream API origin for the Vite proxy.
+`VITE_TALLY_API_BASE_URL` optionally overrides that origin for a deployment.
+`VITE_MILL_ID` selects the typed `sequoia` or `north-fork` profile in
+`src/config/mills.ts`, which owns branding, theme, timezone, icons, PLC defaults,
+and generated PWA metadata.
 `VITE_DASHBOARD_PORT` selects the development and preview server port and
 defaults to `5173`; strict port binding prevents scheduled launches from moving
 silently to a different address.
@@ -317,7 +324,8 @@ verified as part of deployment acceptance.
 | Path | Responsibility |
 |---|---|
 | `README.md` | Public project presentation, setup, and usage |
-| `docs/API.md` | Current Bronze API integration contract |
+| `docs/SFP_API.md` | Sequoia Forest Products Bronze API integration contract |
+| `docs/NFL_API.md` | North Fork Lumber API integration contract |
 | `docs/PROJECT.md` | Architecture, decisions, status, and production questions |
 | `src/api/` | Typed API adapter and models |
 | `src/components/` | Feature-focused presentation and interaction components |

@@ -1,8 +1,8 @@
-# Tally API integration
+# Sequoia Forest Products API integration
 
-The dashboard reads tally data from the current Bronze API. The upstream origin
-is configured with `VITE_TALLY_API_BASE_URL`; browser requests use Vite's
-same-origin `/api` proxy.
+The Sequoia profile reads tally data from the current Bronze API. Its profile
+provides the default upstream origin; `VITE_TALLY_API_BASE_URL` can override it
+for a deployment. Browser requests use Vite's same-origin `/api` proxy.
 
 The service is read-only from this application's perspective. No credentials or
 public production hostnames belong in this repository.

@@ -12,6 +12,8 @@ import type {
   SummaryOut,
 } from "./types";
 import { persistTable, readPersistedTable } from "./persistentTableCache";
+import { currentMill } from "../config/currentMill";
+import { agwoodMockTables } from "./mockAgwoodData";
 
 const API_ROOT = "/api/bronze";
 const PAGE_LIMIT = 1000;
@@ -39,7 +41,7 @@ export class ResponseFormatError extends Error {
 }
 
 interface BronzeRow<T> { payload: T }
-interface BronzePage<T> { rows: Array<BronzeRow<T>>; count: number; offset: number }
+interface BronzePage<T> { rows: Array<BronzeRow<T>>; count?: number; offset?: number }
 interface BronzeTablesResponse {
   tables: Array<{ table_name: string; row_count: number }>;
 }
@@ -58,10 +60,10 @@ interface DetailPayload {
   bd_ft: number;
 }
 
-async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function requestUrl<T>(path: string, signal?: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_ROOT}${path}`, {
+    response = await fetch(path, {
       headers: { Accept: "application/json" },
       signal,
     });
@@ -88,6 +90,10 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   }
 }
 
+function request<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return requestUrl<T>(`${API_ROOT}${path}`, signal);
+}
+
 let tableCountsPromise: Promise<Map<string, number>> | null = null;
 
 function loadTableCounts(): Promise<Map<string, number>> {
@@ -104,7 +110,8 @@ function loadTableCounts(): Promise<Map<string, number>> {
 
 async function fetchTableRows<T>(table: string, startOffset: number, rowCount: number): Promise<T[]> {
   if (startOffset >= rowCount) return [];
-  const firstPage = await request<BronzePage<T>>(`/tally/${table}?limit=${PAGE_LIMIT}&offset=${startOffset}`);
+  const routeTable = currentMill.api.adapter === "nfl" ? table : table.replaceAll("_", "-");
+  const firstPage = await request<BronzePage<T>>(`/tally/${routeTable}?limit=${PAGE_LIMIT}&offset=${startOffset}`);
   if (!Array.isArray(firstPage.rows) || firstPage.rows.length === 0) throw new ResponseFormatError();
   const effectivePageSize = firstPage.rows.length;
   const remainingOffsets = Array.from(
@@ -112,16 +119,23 @@ async function fetchTableRows<T>(table: string, startOffset: number, rowCount: n
     (_, page) => startOffset + effectivePageSize * (page + 1),
   );
   const remainingPages = await Promise.all(remainingOffsets.map((offset) =>
-    request<BronzePage<T>>(`/tally/${table}?limit=${PAGE_LIMIT}&offset=${offset}`),
+    request<BronzePage<T>>(`/tally/${routeTable}?limit=${PAGE_LIMIT}&offset=${offset}`),
   ));
   const pages = [firstPage, ...remainingPages];
   if (pages.some((page) => !Array.isArray(page.rows))) throw new ResponseFormatError();
-  return pages.flatMap((page) => page.rows.map((row) => row.payload));
+  return pages.flatMap((page) => page.rows.map((row) => normalizePayload(row.payload)));
+}
+
+function normalizePayload<T>(payload: T): T {
+  if (!payload || typeof payload !== "object") return payload;
+  const record = payload as Record<string, unknown>;
+  if (typeof record.file_id === "number" || typeof record.File_id !== "number") return payload;
+  return { ...record, file_id: record.File_id } as T;
 }
 
 async function fetchTable<T>(table: string): Promise<T[]> {
   const counts = await loadTableCounts();
-  const tableName = `tally__${table.replaceAll("-", "_")}`;
+  const tableName = `tally__${table}`;
   const rowCount = counts.get(tableName);
   if (typeof rowCount !== "number") throw new ResponseFormatError();
 
@@ -200,8 +214,18 @@ function groupDetails(rows: DetailPayload[], groupBy: GradeMixGrouping): GradeMi
   }));
 }
 
-export const tallyApi = {
-  health: async (_signal?: AbortSignal): Promise<HealthResponse> => {
+interface NflHealthResponse {
+  ok: boolean;
+  service?: string;
+}
+
+const bronzeTallyApi = {
+  health: async (signal?: AbortSignal): Promise<HealthResponse> => {
+    if (currentMill.api.adapter === "nfl") {
+      const health = await requestUrl<NflHealthResponse>("/health", signal);
+      if (!health.ok) throw new ApiError("The North Fork API reported an unhealthy status.", 503);
+      return { status: "ok" };
+    }
     await loadTableCounts();
     return { status: "ok" };
   },
@@ -215,8 +239,8 @@ export const tallyApi = {
   file: async (fileId: number, _signal?: AbortSignal): Promise<FileDetail> => {
     const [files, summaries, solutions, rejects, details] = await Promise.all([
       loadTable<FilePayload>("files"), loadTable<SummaryPayload>("summary"),
-      loadTable<SolutionPayload>("solutions"), loadTable<RejectPayload>("reject-reasons"),
-      loadTable<DetailPayload>("detail-lines"),
+      loadTable<SolutionPayload>("solutions"), loadTable<RejectPayload>("reject_reasons"),
+      loadTable<DetailPayload>("detail_lines"),
     ]);
     const file = files.find((row) => row.file_id === fileId);
     if (!file) throw new ApiError(`Report file ${fileId} was not found.`, 404);
@@ -266,19 +290,19 @@ export const tallyApi = {
   },
 
   rejectReasonTotals: async (range: DateRange, _signal?: AbortSignal): Promise<RejectReasonTotalOut[]> => {
-    const { rows } = await loadRangedTable<RejectPayload>("reject-reasons", range);
+    const { rows } = await loadRangedTable<RejectPayload>("reject_reasons", range);
     return aggregate(rows.map((row) => ({
       key: row.reason, pieces: row.count, bdFt: 0,
     }))).map(({ key, pieces }) => ({ reason: key, total_count: pieces }));
   },
 
   gradeMix: async (range: DateRange, groupBy: GradeMixGrouping, _signal?: AbortSignal) => {
-    const { rows } = await loadRangedTable<DetailPayload>("detail-lines", range);
+    const { rows } = await loadRangedTable<DetailPayload>("detail_lines", range);
     return groupDetails(rows, groupBy);
   },
 
   boardDimensionMix: async (range: DateRange, _signal?: AbortSignal): Promise<GradeMixRow[]> => {
-    const { rows } = await loadRangedTable<DetailPayload>("detail-lines", range);
+    const { rows } = await loadRangedTable<DetailPayload>("detail_lines", range);
     const totals = new Map<string, GradeMixRow>();
     for (const row of rows) {
       const key = `${row.width}|${row.length_ft}|${row.thickness}|${row.grade}`;
@@ -293,3 +317,54 @@ export const tallyApi = {
     return [...totals.values()];
   },
 };
+
+const mockFiles = [...agwoodMockTables.files];
+const mockSummaries = [...agwoodMockTables.summary];
+const mockSolutions = [...agwoodMockTables.solutions];
+const mockRejects = [...agwoodMockTables.reject_reasons];
+const mockDetails = [...agwoodMockTables.detail_lines];
+
+function mockRowsInRange<T extends { file_id: number }>(rows: readonly T[], range: DateRange) {
+  const ids = fileIdsInRange(mockFiles, range);
+  return rows.filter((row) => ids.has(row.file_id));
+}
+
+const agwoodMockApi: typeof bronzeTallyApi = {
+  health: async () => ({ status: "ok" }),
+  files: async (range) => mockFiles.filter((file) => fileIdsInRange(mockFiles, range).has(file.file_id)),
+  file: async (fileId) => {
+    const file = mockFiles.find((row) => row.file_id === fileId);
+    if (!file) throw new ApiError(`Mock Agwood report ${fileId} was not found.`, 404);
+    return {
+      ...file,
+      summary: mockSummaries.find((row) => row.file_id === fileId) ?? null,
+      solutions: mockSolutions.filter((row) => row.file_id === fileId).map(({ solution_number, board_count }) => ({ solution_number, board_count })),
+      reject_reasons: mockRejects.filter((row) => row.file_id === fileId).map(({ reason, count }) => ({ reason, count })),
+      detail_lines: mockDetails.filter((row) => row.file_id === fileId).map(({ wood_type, thickness, width, grade, length_ft, pieces, bd_ft }) => ({ wood_type, thickness, width, grade, length_ft, pieces, bd_ft })),
+    };
+  },
+  productionSummary: async (range) => {
+    const files = new Map(mockFiles.map((file) => [file.file_id, file]));
+    return mockRowsInRange(mockSummaries, range).map((row) => ({ ...row, filename: files.get(row.file_id)?.filename ?? "", report_datetime: files.get(row.file_id)?.report_datetime ?? "" }));
+  },
+  recovery: async (range) => {
+    const files = new Map(mockFiles.map((file) => [file.file_id, file]));
+    return mockRowsInRange(mockSummaries, range).map((row) => ({ file_id: row.file_id, report_datetime: files.get(row.file_id)?.report_datetime ?? "", recovery_lrf_bf_cm: row.recovery_lrf_bf_cm, recovery_bf_cf: row.recovery_bf_cf, fiber_ratio: row.fiber_ratio }));
+  },
+  solutionTotals: async (range) => aggregate(mockRowsInRange(mockSolutions, range).map((row) => ({ key: row.solution_number, pieces: row.board_count, bdFt: 0 }))).map(({ key, pieces }) => ({ solution_number: key, total_board_count: pieces })),
+  rejectReasonTotals: async (range) => aggregate(mockRowsInRange(mockRejects, range).map((row) => ({ key: row.reason, pieces: row.count, bdFt: 0 }))).map(({ key, pieces }) => ({ reason: key, total_count: pieces })),
+  gradeMix: async (range, groupBy) => groupDetails(mockRowsInRange(mockDetails, range) as DetailPayload[], groupBy),
+  boardDimensionMix: async (range) => {
+    const totals = new Map<string, GradeMixRow>();
+    for (const row of mockRowsInRange(mockDetails, range)) {
+      const key = `${row.width}|${row.length_ft}|${row.thickness}|${row.grade}`;
+      const current = totals.get(key) ?? { width: row.width, length_ft: row.length_ft, thickness: row.thickness, grade: row.grade, total_pieces: 0, total_bd_ft: 0 };
+      current.total_pieces += row.pieces;
+      current.total_bd_ft += row.bd_ft;
+      totals.set(key, current);
+    }
+    return [...totals.values()];
+  },
+};
+
+export const tallyApi = currentMill.api.adapter === "mock" ? agwoodMockApi : bronzeTallyApi;

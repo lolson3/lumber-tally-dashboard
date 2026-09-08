@@ -12,15 +12,20 @@ import { ProductionSummary } from "./components/production/ProductionSummary";
 import { ReportsPanel } from "./components/reports/ReportsPanel";
 import { Sidebar } from "./components/sidebar/Sidebar";
 import type { PlcOption } from "./constants/dashboard";
+import { currentMill } from "./config/currentMill";
 import { useScrollSpy } from "./hooks/useScrollSpy";
 import { reportDetailQueryOptions, useReportDetailPrefetch } from "./hooks/useReportDetailPrefetch";
 import { buildBoardShapes, countReportDays, latestReportDate, mergeProductionRecovery, sumAdjustedRuntimeHours, sumNullable } from "./utils/dashboardData";
 import { defaultReportRange, formatReportDate, moneyFormatter, numberFormatter, previousProductionDaysRange } from "./utils/formatting";
 
+const initialReportRange: DateRange = currentMill.initialReportRange === "all"
+  ? { start: "", end: "" }
+  : defaultReportRange();
+
 export function App() {
-  const [draftRange, setDraftRange] = useState<DateRange>(defaultReportRange);
-  const [range, setRange] = useState<DateRange>(defaultReportRange);
-  const [selectedPlc, setSelectedPlc] = useState<PlcOption>("Board Edger");
+  const [draftRange, setDraftRange] = useState<DateRange>(initialReportRange);
+  const [range, setRange] = useState<DateRange>(initialReportRange);
+  const [selectedPlc, setSelectedPlc] = useState<PlcOption>(currentMill.defaultPlc);
   const [gradeMixGrouping, setGradeMixGrouping] = useState<GradeMixGrouping>("grade");
   const [productView, setProductView] = useState<"table" | "boards">("table");
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);

@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import type { DateRange } from "../../api/types";
 import { plcOptions, type PlcOption } from "../../constants/dashboard";
+import { currentMill } from "../../config/currentMill";
 
 interface DataSelectionPanelProps {
   draftRange: DateRange;
@@ -32,7 +33,7 @@ export function DataSelectionPanel(props: DataSelectionPanelProps) {
         <form onSubmit={onApply}>
           <label className="plc-control" htmlFor="plc-select">PLC
             <select className="window-input" id="plc-select" value={selectedPlc} onChange={(event) => onPlcChange(event.target.value as PlcOption)}>
-              {plcOptions.map((plc) => <option key={plc} value={plc} disabled={plc !== "Board Edger"}>{plc}</option>)}
+              {plcOptions.map((plc) => <option key={plc} value={plc} disabled={!currentMill.enabledPlcs.includes(plc)}>{plc}</option>)}
             </select>
           </label>
           <label>Start date<input className="window-input" type="date" value={draftRange.start} max={draftRange.end || undefined} onChange={(event) => onDraftRangeChange({ ...draftRange, start: event.target.value })} /></label>
