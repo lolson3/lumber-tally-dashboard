@@ -16,10 +16,43 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ ! -f node_modules/.package-lock.json ]; then
+if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
   echo "Installing dashboard dependencies..."
   npm ci
 fi
 
-echo "Starting Lumber Tally Dashboard..."
-exec npm start
+START_MODE="${1:-}"
+DEMO_FROM_ENV=false
+case "${DEMO_MODE:-false}" in
+  true|TRUE|1|yes|YES) START_MODE="-demo"; DEMO_FROM_ENV=true ;;
+  false|FALSE|0|no|NO|"") ;;
+  *)
+    echo "ERROR: DEMO_MODE must be true or false." >&2
+    exit 2
+    ;;
+esac
+
+if [ "$DEMO_FROM_ENV" = true ] && [ "$#" -ne 0 ]; then
+  echo "ERROR: DEMO_MODE=true does not accept launcher arguments." >&2
+  exit 2
+fi
+
+case "$START_MODE" in
+  "")
+    echo "Starting Lumber Tally Dashboard..."
+    exec npm start
+    ;;
+  -demo|--demo)
+    if [ "$#" -gt 1 ]; then
+      echo "ERROR: -demo does not accept additional arguments." >&2
+      exit 2
+    fi
+    echo "Preparing deterministic demo data..."
+    echo "Starting Lumber Tally Dashboard in DEMO mode..."
+    exec npm start -- --mode demo
+    ;;
+  *)
+    echo "ERROR: Unknown option '$1'. Use -demo to run with fake data." >&2
+    exit 2
+    ;;
+esac

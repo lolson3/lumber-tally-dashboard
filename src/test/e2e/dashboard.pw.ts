@@ -42,6 +42,16 @@ test("keeps navigation usable at mobile width", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await page.getByRole("button", { name: "All Dates" }).click();
+  const filterFieldLayout = await page.locator(".filter-bar form").evaluate((form) => {
+    const formBounds = form.getBoundingClientRect();
+    const fields = Array.from(form.querySelectorAll(":scope > label")).slice(0, 3).map((field) => field.getBoundingClientRect());
+    return {
+      oneRow: new Set(fields.map((field) => Math.round(field.top))).size === 1,
+      contained: fields.every((field) => field.left >= formBounds.left && field.right <= formBounds.right + 1),
+    };
+  });
+  expect(filterFieldLayout).toEqual({ oneRow: true, contained: true });
+  await page.getByRole("button", { name: "Open dashboard menu" }).click();
   const navigationLayout = await page.getByRole("navigation", { name: "Dashboard sections" }).evaluate((navigation) => ({
     clientWidth: navigation.clientWidth,
     scrollWidth: navigation.scrollWidth,
@@ -59,12 +69,17 @@ test("keeps navigation usable at mobile width", async ({ page }) => {
   expect(navigationLayout.scrollWidth).toBeLessThanOrEqual(navigationLayout.clientWidth);
   expect(navigationLayout.linkRows).toBeGreaterThan(1);
   expect(navigationLayout.lastRowCenterOffset).toBeLessThan(1);
-  const brandCenterOffset = await page.locator(".brand span").evaluate((brand) => {
+  const brandLayout = await page.locator(".brand-mobile-name").evaluate((brand) => {
     const brandBounds = brand.getBoundingClientRect();
     const sidebarBounds = brand.closest(".sidebar")!.getBoundingClientRect();
-    return Math.abs((brandBounds.left + brandBounds.right) / 2 - (sidebarBounds.left + sidebarBounds.right) / 2);
+    const menuBounds = brand.closest(".sidebar")!.querySelector(".menu-toggle")!.getBoundingClientRect();
+    return {
+      insideSidebar: brandBounds.left >= sidebarBounds.left && brandBounds.right <= sidebarBounds.right,
+      gapBeforeMenu: menuBounds.left - brandBounds.right,
+    };
   });
-  expect(brandCenterOffset).toBeLessThan(1);
+  expect(brandLayout.insideSidebar).toBe(true);
+  expect(brandLayout.gapBeforeMenu).toBeGreaterThanOrEqual(8);
 
   const gradeChart = page.getByLabel("Board feet by Grade bar chart");
   await expect(gradeChart).toBeVisible();
@@ -159,8 +174,11 @@ test("shows chart tooltips above dashboard panels", async ({ page }) => {
   await expect(productTooltip).toBeVisible();
   await expect(productTooltip).toContainText("pieces");
   await expect(productTooltip).toContainText("board feet");
+  await page.mouse.move(2, 2);
+  await expect(productTooltip).toHaveCount(0);
 
   const mixBar = page.getByLabel("Board feet by Grade bar chart").locator(".recharts-bar-rectangle").first();
+  await mixBar.scrollIntoViewIfNeeded();
   await mixBar.hover();
   const visibleTooltip = page.locator("body > .recharts-tooltip-wrapper:visible");
   await expect(visibleTooltip).toContainText("Board feet");
@@ -170,6 +188,46 @@ test("shows chart tooltips above dashboard panels", async ({ page }) => {
   const boardTooltip = page.locator("body > .floating-chart-tooltip");
   await expect(boardTooltip).toBeVisible();
   await expect(boardTooltip).toContainText("Grade 2");
+});
+
+test("keeps mobile metric and data panels balanced and bounded", async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 844 });
+  await page.reload();
+  await page.getByRole("button", { name: "All Dates" }).click();
+
+  const gridBounds = await page.locator(".metric-grid").boundingBox();
+  const finalMetricBounds = await page.locator(".metric-card").last().boundingBox();
+  expect(gridBounds).not.toBeNull();
+  expect(finalMetricBounds).not.toBeNull();
+  expect(Math.abs(finalMetricBounds!.width - gridBounds!.width)).toBeLessThan(1);
+
+  const summaryBounds = await page.locator("#summary").boundingBox();
+  const reportsBounds = await page.locator("#reports").boundingBox();
+  expect(summaryBounds).not.toBeNull();
+  expect(reportsBounds).not.toBeNull();
+  expect(summaryBounds!.height).toBeLessThanOrEqual(560);
+  expect(reportsBounds!.height).toBeGreaterThanOrEqual(700);
+  await expect(page.locator("#summary .table-scroll").first()).toHaveCSS("overflow-y", "auto");
+  await expect(page.locator("#reports .table-scroll").first()).toHaveCSS("overflow-y", "auto");
+});
+
+test("positions mobile shortcuts below the sticky header", async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 844 });
+  for (const target of [
+    { label: "Summary", id: "summary", maximumTop: 90 },
+    { label: "Product Breakdown", id: "product-breakdown", maximumTop: 90 },
+    { label: "Output & Rejects", id: "output&rejects", maximumTop: 90 },
+    { label: "Reports", id: "reports", maximumTop: 90 },
+  ]) {
+    await page.getByRole("button", { name: "Open dashboard menu" }).click();
+    await page.getByRole("link", { name: target.label }).click();
+    await expect(page).toHaveURL(new RegExp(`#${target.id.replace("&", "\\&")}$`));
+    const section = page.locator(`[id="${target.id}"]`);
+    await expect.poll(() => section.evaluate((element) => Math.round(element.getBoundingClientRect().top)))
+      .toBeLessThanOrEqual(target.maximumTop);
+    expect(await section.evaluate((element) => Math.round(element.getBoundingClientRect().top)))
+      .toBeGreaterThanOrEqual(78);
+  }
 });
 
 test("dismisses touch tooltips when mobile scrolling begins", async ({ page }) => {

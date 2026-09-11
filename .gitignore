@@ -150,6 +150,8 @@ Desktop.ini
 # Local editor settings
 .idea/
 .vscode/
+.agents/
+.codex/
 *.suo
 *.user
 *.swp

@@ -27,9 +27,10 @@ export function useScrollSpy() {
         return { id, bottom: dataSelectionEnd ?? sectionBounds.bottom };
       }).filter((item): item is { id: DashboardSection; bottom: number } => item !== null);
 
+      const sectionThreshold = window.matchMedia("(max-width: 720px)").matches ? 84 : 1;
       let current = bounds[0]?.id ?? null;
       for (let index = 1; index < bounds.length; index += 1) {
-        if (bounds[index - 1].bottom <= 1) current = bounds[index].id;
+        if (bounds[index - 1].bottom <= sectionThreshold) current = bounds[index].id;
       }
       setActiveSection(current);
       if (current) {

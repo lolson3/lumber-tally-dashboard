@@ -27,8 +27,10 @@ function manifestForMill(mill: ReturnType<typeof getMillProfile>) {
 }
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
-  const mill = getMillProfile(env.VITE_MILL_ID);
+  const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
+  const demoMode = mode === "demo";
+  const isolatedTestMode = mode === "test" || mode === "e2e";
+  const mill = getMillProfile(isolatedTestMode ? "sequoia" : env.VITE_MILL_ID);
   const millManifest = manifestForMill(mill);
   const apiTarget = env.VITE_TALLY_API_BASE_URL || (mill.api.originEnv ? env[mill.api.originEnv] : "") || mill.api.defaultOrigin;
   const dashboardPort = Number(env.VITE_DASHBOARD_PORT || "5173");
@@ -39,7 +41,8 @@ export default defineConfig(({ mode }) => {
     .split(",")
     .map((host) => host.trim())
     .filter(Boolean);
-  const proxy = mill.api.adapter === "mock" ? undefined : {
+  // Demo mode must not even expose a proxy capable of reaching a real service.
+  const proxy = demoMode || mill.api.adapter === "mock" ? undefined : {
     "/api": {
       target: apiTarget,
       changeOrigin: true,
@@ -47,9 +50,13 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
-    // Adapter unit tests target the production bronze contract regardless of
-    // which branded view is selected in the local .env file.
-    ...(mode === "test" ? { define: { "import.meta.env.VITE_MILL_ID": JSON.stringify("sequoia") } } : {}),
+    define: {
+      // Adapter unit tests target the production bronze contract regardless of
+      // which branded view is selected in the local .env file.
+      ...(isolatedTestMode ? { "import.meta.env.VITE_MILL_ID": JSON.stringify("sequoia") } : {}),
+      "import.meta.env.VITE_DEMO_MODE": JSON.stringify(demoMode ? "true" : "false"),
+      "import.meta.env.VITE_FAKE_DATA_SEED": JSON.stringify(env.FAKE_DATA_SEED || "demo-seed-v1"),
+    },
     plugins: [react(), {
       name: "mill-profile",
       configureServer(server) {

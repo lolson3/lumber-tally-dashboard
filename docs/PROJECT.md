@@ -74,7 +74,6 @@ third-party runtime assets or public internet access.
 - Support for PLCs other than Board Edger.
 - Public internet exposure.
 - User accounts or application-level authorization.
-- Docker-based deployment.
 - A separate dashboard backend, unless deployment or security requirements make
   one necessary.
 
@@ -166,9 +165,9 @@ src/
   styles.css            Global responsive visual system
 public/
   icons/                Platform and maskable installation icons
-  manifest.webmanifest  PWA identity, display, and launch metadata
   offline.html          Offline navigation fallback
   sw.js                 Static application-shell caching; API requests bypassed
+vite.config.ts          Build config and mill-specific PWA manifest generation
 ```
 
 Component code owns distinct interface regions. Hooks own React state/effect
@@ -282,13 +281,15 @@ verified as part of deployment acceptance.
 - **Reason:** Improve ownership, testability, and maintainability without creating
   one file for every minor function.
 
-### AD-006: Native deployment; Docker deferred
+### AD-006: Containerized deployment
 
-- **Status:** Accepted.
-- **Decision:** Do not require Docker for the demo or initial deployment.
-- **Reason:** The intended environment currently favors a native local service.
-- **Consequence:** Final web-server, service-management, and upgrade procedures
-  depend on the selected host operating system.
+- **Status:** Accepted and implemented.
+- **Decision:** Provide a repository-owned Dockerfile and Compose definition,
+  defaulting to the isolated Agwood demo configuration.
+- **Reason:** The target TrueNAS environment builds directly from the repository
+  and requires repeatable startup, health monitoring, and safe configuration.
+- **Consequence:** Real-data deployments must explicitly disable demo mode and
+  provide an API origin reachable from the container.
 
 ### AD-007: No external runtime assets
 
@@ -388,5 +389,4 @@ verified as part of deployment acceptance.
 
 - Established the React, TypeScript, Vite, TanStack Query, Recharts, and plain-CSS
   application foundation.
-- Defined the read-only local-dashboard objective and deferred Docker pending the
-  final deployment environment.
+- Defined the read-only local-dashboard objective.

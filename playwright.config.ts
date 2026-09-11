@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const testServerUrl = "http://127.0.0.1:4173";
+const testServerPort = Number(process.env.PLAYWRIGHT_PORT || "4173");
+if (!Number.isInteger(testServerPort) || testServerPort < 1 || testServerPort > 65_535) {
+  throw new Error("PLAYWRIGHT_PORT must be an integer between 1 and 65535.");
+}
+const testServerUrl = `http://127.0.0.1:${testServerPort}`;
 
 export default defineConfig({
   testDir: "./src/test/e2e",
@@ -17,7 +21,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
+    command: `npm run preview -- --host 127.0.0.1 --port ${testServerPort} --strictPort`,
     url: testServerUrl,
     reuseExistingServer: false,
   },

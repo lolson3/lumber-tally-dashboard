@@ -13,7 +13,7 @@ import type {
 } from "./types";
 import { persistTable, readPersistedTable } from "./persistentTableCache";
 import { currentMill } from "../config/currentMill";
-import { agwoodMockTables } from "./mockAgwoodData";
+import { demoMockTables } from "./mockDemoData";
 
 const API_ROOT = "/api/bronze";
 const PAGE_LIMIT = 1000;
@@ -318,18 +318,18 @@ const bronzeTallyApi = {
   },
 };
 
-const mockFiles = [...agwoodMockTables.files];
-const mockSummaries = [...agwoodMockTables.summary];
-const mockSolutions = [...agwoodMockTables.solutions];
-const mockRejects = [...agwoodMockTables.reject_reasons];
-const mockDetails = [...agwoodMockTables.detail_lines];
+const mockFiles = [...demoMockTables.files];
+const mockSummaries = [...demoMockTables.summary];
+const mockSolutions = [...demoMockTables.solutions];
+const mockRejects = [...demoMockTables.reject_reasons];
+const mockDetails = [...demoMockTables.detail_lines];
 
 function mockRowsInRange<T extends { file_id: number }>(rows: readonly T[], range: DateRange) {
   const ids = fileIdsInRange(mockFiles, range);
   return rows.filter((row) => ids.has(row.file_id));
 }
 
-const agwoodMockApi: typeof bronzeTallyApi = {
+const demoMockApi: typeof bronzeTallyApi = {
   health: async () => ({ status: "ok" }),
   files: async (range) => mockFiles.filter((file) => fileIdsInRange(mockFiles, range).has(file.file_id)),
   file: async (fileId) => {
@@ -367,4 +367,8 @@ const agwoodMockApi: typeof bronzeTallyApi = {
   },
 };
 
-export const tallyApi = currentMill.api.adapter === "mock" ? agwoodMockApi : bronzeTallyApi;
+// Demo mode is a build-time hard override: no profile can reach a real API
+// while the launcher is running with -demo.
+export const tallyApi = import.meta.env.VITE_DEMO_MODE === "true" || currentMill.api.adapter === "mock"
+  ? demoMockApi
+  : bronzeTallyApi;

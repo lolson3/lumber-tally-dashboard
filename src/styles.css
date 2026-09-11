@@ -43,6 +43,8 @@ h2 { font-size: 1.16rem; letter-spacing: -0.025em; }
 .nav-link.active { background: rgba(255,255,255,.13); color: white; }
 .dashboard-surface { background: var(--dashboard-background, #f4efe9); min-width: 0; }
 .page-header { min-height: 190px; width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding: 48px 0 70px; display: flex; align-items: flex-end; justify-content: flex-start; gap: 22px; }
+.page-title-row { align-items: center; display: flex; flex-wrap: wrap; gap: 14px; }
+.demo-badge { background: var(--amber); border-radius: 999px; color: white; font-size: .72rem; font-weight: 800; letter-spacing: .08em; padding: 7px 11px; text-transform: uppercase; }
 .plc-control { min-width: 180px; }
 .plc-control select { appearance: auto; font-size: 1rem; font-weight: 700; min-width: 180px; }
 .plc-control select:focus-visible { outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent); outline-offset: 2px; }
@@ -231,6 +233,7 @@ pre { background: #fff0e3; border: 1px solid #f2d2bb; border-radius: 8px; color:
   .sidebar nav { background: var(--forest); box-shadow: 0 16px 30px rgba(51,37,31,.25); display: none; gap: 3px; left: 0; padding: 8px 12px 14px; position: absolute; right: 0; top: 100%; }
   .sidebar nav.menu-open { display: grid; }
   .nav-link { padding: 11px 13px; width: 100%; }
+  .section-anchor, .page-header.section-anchor { scroll-margin-top: 84px; }
   .page-header { min-height: 140px; width: min(100% - 24px, 1480px); padding: 28px 0 56px; }
   .page-header { align-items: flex-start; flex-direction: column; }
   .page-header .typewriter-heading { display: none; }
@@ -238,21 +241,26 @@ pre { background: #fff0e3; border: 1px solid #f2d2bb; border-radius: 8px; color:
   .typewriter-heading { white-space: normal; width: auto; }
   main { width: min(100% - 24px, 1480px); }
   .filter-bar { padding: 20px; }
-  .filter-bar form { align-items: stretch; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; width: 100%; }
-  .filter-bar form > label { justify-self: center; min-width: 0; width: 75%; }
-  .filter-bar .window-input { max-width: 100%; min-width: 0; width: 100%; }
+  .filter-bar form { align-items: stretch; display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; width: 100%; }
+  .filter-bar form > label { justify-self: stretch; min-width: 0; width: 100%; }
+  .filter-bar .plc-control, .filter-bar .plc-control select { min-width: 0; }
+  .filter-bar .window-input { font-size: clamp(.68rem, 2.2vw, .82rem); max-width: 100%; min-width: 0; padding-inline: 5px; width: 100%; }
   .date-actions { grid-column: 1 / -1; }
   .date-actions button { flex: 1; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .metric-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .paired-panel-row { grid-template-columns: 1fr; }
   [id="output&rejects"] { height: auto; }
   [id="output&rejects"] > .panel { height: auto; min-height: 420px; }
   .mix-chart-panel .chart-wrap { min-height: 310px; }
   .wide-panel { grid-column: auto; }
-  #summary, #product-breakdown, #reports { height: auto; min-height: 0; }
-  #summary > .panel, #product-breakdown > .panel, #reports > .panel { min-height: 430px; }
-  #reports .report-panel-viewport { min-height: 430px; }
+  #summary { height: clamp(430px, 70vh, 560px); min-height: 0; }
+  #reports { height: max(560px, calc(100dvh - 100px)); min-height: 0; }
+  #product-breakdown { height: auto; min-height: 0; }
+  #summary > .panel, #reports > .panel { height: 100%; min-height: 0; }
+  #product-breakdown > .panel { min-height: 430px; }
+  #reports .report-panel-viewport { min-height: 0; }
   .panel-heading { align-items: flex-start; flex-wrap: wrap; padding: 18px 16px 14px; }
   .summary-actions { flex-wrap: wrap; }
   .table-scroll { max-width: 100%; }
@@ -262,7 +270,7 @@ pre { background: #fff0e3; border: 1px solid #f2d2bb; border-radius: 8px; color:
 }
 
 @media (max-width: 450px) {
-  .filter-bar form, .metric-grid { grid-template-columns: minmax(0, 1fr); }
+  .metric-grid { grid-template-columns: minmax(0, 1fr); }
   .date-actions { flex-wrap: wrap; }
   .date-actions button { flex: 1 1 calc(50% - 6px); }
   .metric-card { min-height: 96px; }

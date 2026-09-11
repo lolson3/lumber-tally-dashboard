@@ -1,6 +1,7 @@
 import { getMillProfile } from "./mills";
 
 export const currentMill = getMillProfile(import.meta.env.VITE_MILL_ID);
+export const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
 export function applyMillProfile() {
   const root = document.documentElement;
@@ -12,7 +13,7 @@ export function applyMillProfile() {
   root.style.setProperty("--focus", currentMill.theme.focus);
   root.style.setProperty("--sidebar-text", currentMill.theme.sidebarText);
   root.style.setProperty("--dashboard-background", currentMill.theme.background);
-  document.title = currentMill.dashboardName;
+  document.title = demoMode ? `DEMO — ${currentMill.dashboardName}` : currentMill.dashboardName;
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", currentMill.theme.themeColor);
   document.querySelector('meta[name="description"]')?.setAttribute("content", currentMill.description);
   document.querySelector('meta[name="application-name"]')?.setAttribute("content", currentMill.dashboardName);
