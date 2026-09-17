@@ -88,3 +88,37 @@ TALLY_API_BASE_URL=http://tally-api-host:7304
 
 Restart the container after changing a runtime value. The configured service
 must be reachable from the container network.
+
+## Live contract verification
+
+Run the read-only production contract gate from a network that can reach SFP:
+
+```bash
+npm run verify:sfp
+```
+
+The verifier exercises the table inventory and all five Tally resources,
+follows the same 1,000-row pagination policy as the dashboard, validates every
+consumed field, checks cross-table `file_id` references, compares dashboard
+aggregations with source totals, and records request and concurrent-load timing.
+It reads the origin from process variables or ignored `.env` files and does not
+print the private address.
+
+### Verified snapshot: 2026-09-17
+
+The configured live SFP service passed:
+
+| Resource | Rows | Pages | Elapsed |
+|---|---:|---:|---:|
+| Table inventory | 9 tables | 1 | 652 ms |
+| Files | 242 | 1 | 598 ms |
+| Summary | 242 | 1 | 1,749 ms |
+| Solutions | 608 | 1 | 2,445 ms |
+| Reject reasons | 3,388 | 4 | 8,116 ms |
+| Detail lines | 7,136 | 8 | 8,669 ms |
+
+The five Tally resources loaded concurrently in 8,671 ms. All fields consumed
+by the dashboard had their expected types, with no observed null or missing
+values. All cross-table references resolved, and all 11 dashboard/source total
+comparisons passed. Counts and timings are a live snapshot rather than fixed
+contract values.

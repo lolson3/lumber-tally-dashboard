@@ -261,6 +261,18 @@ npm run test:all
 executes the Playwright desktop and mobile workflows. The same pipeline is
 configured for GitHub Actions.
 
+Run the read-only live SFP contract and performance gate from a machine that
+can reach the configured private API:
+
+```bash
+npm run verify:sfp
+```
+
+The verifier reads the API origin from ignored environment configuration,
+without printing it, and validates every required endpoint, pagination,
+field types/nullability, cross-table references, dashboard/source aggregation
+parity, and concurrent cold-load timing. It never writes to the API.
+
 ## Production build
 
 ```bash

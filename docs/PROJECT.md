@@ -177,6 +177,7 @@ docker/
 bin/
   start.bat             Windows development/demo launcher
   start.sh              Unix development/demo launcher
+  verify-sfp-api.mjs    Read-only live SFP contract and performance gate
 vite.config.ts          Build config and mill-specific PWA manifest generation
 ```
 
@@ -376,6 +377,9 @@ verified as part of deployment acceptance.
   deployments.
 - Expired Bronze table-count metadata with the one-minute dataset cache so new
   rows become available without reloading the application.
+- Verified the complete live SFP Bronze contract, field types/nullability,
+  cross-table references, dashboard/source totals, and an 8.7-second concurrent
+  cold load using a repeatable read-only gate.
 
 ### 2026-08-13
 

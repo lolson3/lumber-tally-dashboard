@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build:e2e && playwright test",
-    "test:all": "npm test && npm run test:e2e"
+    "test:all": "npm test && npm run test:e2e",
+    "verify:sfp": "node bin/verify-sfp-api.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.85.5",
