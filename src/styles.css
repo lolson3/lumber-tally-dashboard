@@ -217,7 +217,7 @@ pre { background: #fff0e3; border: 1px solid #f2d2bb; border-radius: 8px; color:
 @media (max-width: 720px) {
   .app-shell { display: block; }
   .sidebar { align-items: center; display: flex; flex-direction: row; height: 72px; justify-content: flex-start; min-height: 0; overflow: visible; padding: 8px 12px; position: sticky; top: 0; z-index: 1000; }
-  .brand { font-size: 1.05rem; gap: 9px; justify-content: flex-start; min-height: 0; min-width: 0; padding: 0 100px 0 0; text-align: left; }
+  .brand { font-size: 1.05rem; gap: 9px; justify-content: flex-start; min-height: 0; min-width: 0; padding: 0 102px 0 0; text-align: left; }
   .brand-logo { flex: 0 0 auto; max-height: 54px; max-width: 64px; }
   .brand-desktop-fallback { display: none; }
   .brand-mobile-name { color: white; display: block; flex: 1 1 auto; font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; font-size: .71rem; font-weight: 700; letter-spacing: .16em; line-height: normal; max-width: 100%; min-width: 0; overflow: hidden; position: relative; text-transform: uppercase; white-space: nowrap; width: max-content; }
