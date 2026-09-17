@@ -100,21 +100,31 @@ test("labels the output and rejects section", async ({ page }) => {
   await expect(page).toHaveURL(/#output&rejects$/);
 });
 
-test("reuses unchanged Bronze tables from persistent storage on revisit", async ({ page }) => {
+test("does not retain production Bronze tables in IndexedDB", async ({ page }) => {
   await page.getByRole("button", { name: "All Dates" }).click();
   await expect(page.getByLabel("Board feet by Grade bar chart")).toBeVisible();
+
   await expect.poll(() => page.evaluate(async () => {
+    const databases = await indexedDB.databases();
+    return databases.some((database) => database.name === "lumber-tally-dashboard-sequoia");
+  })).toBe(false);
+
+  // Simulate an upgrade from a release that persisted production data.
+  await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open("lumber-tally-dashboard-sequoia", 1);
+      request.onupgradeneeded = () => request.result.createObjectStore("bronze-tables", { keyPath: "table" });
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    return new Promise<number>((resolve, reject) => {
-      const request = database.transaction("bronze-tables", "readonly").objectStore("bronze-tables").count();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction("bronze-tables", "readwrite");
+      transaction.objectStore("bronze-tables").put({ table: "tally__files", rowCount: 1, rows: [{ file_id: 7 }] });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
     });
-  })).toBeGreaterThanOrEqual(4);
+    database.close();
+  });
 
   const tableRequests: string[] = [];
   page.on("request", (request) => {
@@ -123,7 +133,11 @@ test("reuses unchanged Bronze tables from persistent storage on revisit", async 
   await page.reload();
   await page.getByRole("button", { name: "All Dates" }).click();
   await expect(page.getByRole("table", { name: "Production Summary" })).toBeVisible();
-  expect(tableRequests).toEqual([]);
+  expect(tableRequests.length).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(async () => {
+    const databases = await indexedDB.databases();
+    return databases.some((database) => database.name === "lumber-tally-dashboard-sequoia");
+  })).toBe(false);
 });
 
 test("publishes install metadata and activates its service worker", async ({ page, request }) => {

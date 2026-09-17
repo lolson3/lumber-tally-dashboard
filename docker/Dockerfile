@@ -19,9 +19,11 @@ COPY --from=build /app/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY docker/15-dashboard-runtime.envsh /docker-entrypoint.d/15-dashboard-runtime.envsh
+COPY docker/healthcheck.sh /usr/local/bin/dashboard-healthcheck
 
 RUN sed -i 's/\r$//' /docker-entrypoint.d/15-dashboard-runtime.envsh \
-    && chmod +x /docker-entrypoint.d/15-dashboard-runtime.envsh \
+    && sed -i 's/\r$//' /usr/local/bin/dashboard-healthcheck \
+    && chmod +x /docker-entrypoint.d/15-dashboard-runtime.envsh /usr/local/bin/dashboard-healthcheck \
     && mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp \
     && chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/conf.d /tmp/nginx
 
@@ -29,7 +31,7 @@ USER nginx
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=15s --start-period=30s --retries=3 \
+  CMD ["/usr/local/bin/dashboard-healthcheck"]
 
 CMD ["nginx", "-g", "daemon off;"]

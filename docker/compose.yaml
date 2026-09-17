@@ -1,6 +1,6 @@
 services:
   dashboard:
-    image: "${DASHBOARD_IMAGE:-ghcr.io/lolson3/lumber-tally-dashboard:latest}"
+    image: "${DASHBOARD_IMAGE:?Set DASHBOARD_IMAGE to an immutable commit tag or digest}"
     pull_policy: always
     init: true
     restart: unless-stopped

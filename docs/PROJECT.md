@@ -16,14 +16,16 @@ belong in the [README](../README.md), while endpoint details belong in the
 | Application | Responsive, read-only React dashboard |
 | Supported PLC | Board Edger |
 | API | Bronze tally table API |
-| Deployment | Published Docker image on TrueNAS with nginx and Cloudflare Tunnel planned |
+| Deployment | Published Docker image on TrueNAS with nginx, available only on the permitted LAN |
 | Test coverage | Unit, component, API integration, accessibility, and Playwright workflows |
 | Containerization | Multi-stage Node build with an nginx production runtime |
+| Security baseline | Complete locally; deployment-owner LAN controls require acceptance testing |
+| Release gate | Tests, browser checks, container build, and health/security smoke checks required before publish |
 | Last reviewed | 2026-09-17 |
 
 The dashboard is suitable for demonstrations and stakeholder review. Production
-release still requires deployment hardening, an agreed security model,
-monitoring, and live-environment acceptance testing.
+release still requires the deployment-owner network controls, monitoring, and
+live-environment acceptance testing recorded in the security baseline.
 
 ## Product objective
 
@@ -105,9 +107,8 @@ The client therefore:
 5. Applies inclusive date filtering to the date portion of `report_datetime`.
 6. Calculates chart and table aggregates locally.
 7. Shares in-flight reads and caches completed tables for one minute.
-8. Persists approximately 1.4 MB of compact Bronze domain payloads in IndexedDB,
-   namespaced by mill profile, refreshing table counts after the one-minute
-   cache expires and fetching only appended rows when counts increase.
+8. Retains Bronze rows only in memory and removes IndexedDB data created by
+   older releases for every known mill profile.
 
 This approach reduced a measured full sequential load from approximately 52.5
 seconds to approximately 13 seconds on the observed network. Lightweight panels
@@ -133,6 +134,12 @@ The production entry point registers a same-origin service worker. It precaches
 the generated application shell and static assets, supplies an offline fallback,
 and bypasses `/api` so production records retain their normal live-data and
 error semantics. PWA installation from non-local devices requires trusted HTTPS.
+
+The image has separate health layers. `/healthz` reports nginx liveness.
+`/readyz` checks the active mill's upstream API in non-demo deployments, and
+Docker health requires both endpoints. Sequoia uses `/api/bronze/tables`; North
+Fork uses `/health`. Demo and in-process mock profiles have no upstream
+dependency.
 
 ### Frontend responsibilities
 
@@ -207,13 +214,16 @@ configuration, not source control.
 
 The expected production deployment process is:
 
-1. Run `npm ci` and `npm run test:all` in CI.
-2. Build and publish the multi-stage image from the verified commit.
-3. Pin that image version in the TrueNAS application.
+1. Run the reusable release gate: dependencies, all automated tests, production
+   build, container build, and container smoke tests.
+2. Publish only after the gate succeeds, tagging the image with the full commit
+   SHA and updating `latest` for convenience.
+3. Pin the commit tag or published registry digest in the TrueNAS application;
+   never deploy `latest` to production.
 4. Configure the mill, demo mode, and API origin at container startup.
-5. Route Cloudflare Tunnel to nginx port 8080 and protect the hostname with the
-   agreed Access policy.
-6. Restrict inbound access using host firewall and network policy.
+5. Publish nginx port 8080 only to the intended business LAN.
+6. Block access from guest, untrusted, and public networks using firewall and
+   network policy.
 7. Add logging, monitoring, and rollback procedures required by the agreed
    production environment.
 
@@ -222,15 +232,13 @@ host.
 
 ## Security posture
 
-- Keep the dashboard and API on the intended private network.
-- Do not commit credentials, private deployment addresses, or environment files.
-- Proxy API traffic through the dashboard origin.
-- Treat network location as a boundary, not as authentication.
-- Add organization-integrated or proxy-level authentication if users cannot all
-  share the same trust level.
-- Decide HTTPS and certificate requirements before production deployment.
-- Keep the application read-only unless a separately reviewed write workflow is
-  introduced.
+The production security decision is recorded in [SECURITY.md](SECURITY.md).
+The dashboard is served by IP over the permitted local network, and network
+membership is the authorization boundary. Repository controls restrict the API
+proxy to reads, prevent API caching and credential forwarding, and disable
+persistent production-table storage in the browser. TrueNAS networking,
+firewall, monitoring, and rollback configuration remain deployment-owner
+responsibilities.
 
 ## Quality and verification
 
@@ -332,14 +340,47 @@ verified as part of deployment acceptance.
 - **Reason:** The demo is approaching production readiness and critical workflows
   need repeatable regression protection.
 
+### AD-010: LAN-only access and session-only production data
+
+- **Status:** Accepted and implemented in the application on 2026-09-17.
+- **Decision:** Serve the dashboard by IP only on the permitted business LAN,
+  with network membership as the access boundary. Permit only read requests
+  through nginx, prevent proxy/API caching, strip browser authentication
+  material before proxying, and keep live Bronze rows out of persistent browser
+  storage.
+- **Reason:** The dashboard is read-only but processes complete source tables.
+  LAN restriction and session-only browser data minimize exposure and locally
+  retained operational information without adding an application identity store.
+- **Consequence:** A cold load refetches the complete source dataset; the verified
+  SFP snapshot completed that concurrent load in approximately 8.7 seconds.
+
+### AD-011: Gated, immutable container releases
+
+- **Status:** Accepted and implemented on 2026-09-17.
+- **Decision:** The main publishing workflow calls the same reusable release gate
+  used for verification and cannot publish until it succeeds. Successful main
+  builds publish both `latest` and the full commit SHA, while production Compose
+  configuration requires an explicit image reference.
+- **Reason:** A failed commit must never become a published release, and a
+  production deployment must not change merely because a mutable tag moves.
+
+### AD-012: Dependency-aware container health
+
+- **Status:** Accepted and implemented on 2026-09-17.
+- **Decision:** Keep `/healthz` as nginx liveness, expose `/readyz` for dependency
+  readiness, and make Docker health require both. Mock/demo deployments have no
+  external API dependency.
+- **Reason:** A running static server is not production-ready when its required
+  data service is unavailable.
+- **Consequence:** TrueNAS can distinguish an API outage from a healthy
+  dashboard. Restart-on-unhealthy behavior remains an orchestrator decision.
+
 ## Open production questions
 
 | Question | Why it matters |
 |---|---|
 | Which TrueNAS release will host the published image? | Determines the exact Custom App and Compose deployment workflow. |
 | Will the dashboard and API share a host? | Determines firewall rules, proxy routing, and failure boundaries. |
-| Which users and devices may access the dashboard? | Determines authentication and authorization requirements. |
-| Is local HTTPS required? | Determines certificate issuance and client trust configuration. |
 | Should report timestamps be displayed beyond their source calendar date? | The default range is defined in Pacific time; future timestamp displays may need explicit conversion rules. |
 | When will other PLC data contracts become available? | Determines how PLC-specific endpoints, types, and UI modules should be introduced. |
 | What data volume and ingestion rate are expected in production? | Determines whether client-side full-table processing remains viable. |
@@ -353,6 +394,7 @@ verified as part of deployment acceptance.
 | `README.md` | Public project presentation, setup, and usage |
 | `docs/SFP_API.md` | Sequoia Forest Products Bronze API integration contract |
 | `docs/NFL_API.md` | North Fork Lumber API integration contract |
+| `docs/SECURITY.md` | LAN-only production security boundary and acceptance checks |
 | `docs/PROJECT.md` | Architecture, decisions, status, and production questions |
 | `src/api/` | Typed API adapter and models |
 | `src/components/` | Feature-focused presentation and interaction components |
@@ -372,7 +414,8 @@ verified as part of deployment acceptance.
 - Replaced the container's Vite development runtime with a multi-stage build and
   nginx production server.
 - Added validated runtime mill/demo configuration, runtime API proxy selection,
-  profile-specific PWA manifests, security headers, and `/healthz` monitoring.
+  profile-specific PWA manifests, security headers, `/healthz` liveness, and
+  API-aware `/readyz` readiness monitoring.
 - Preserved a single reusable image for Agwood demo, Sequoia, and North Fork
   deployments.
 - Expired Bronze table-count metadata with the one-minute dataset cache so new
@@ -380,6 +423,12 @@ verified as part of deployment acceptance.
 - Verified the complete live SFP Bronze contract, field types/nullability,
   cross-table references, dashboard/source totals, and an 8.7-second concurrent
   cold load using a repeatable read-only gate.
+- Completed the repository security baseline: production data is session-only,
+  legacy IndexedDB data is removed, the API proxy is read-only and non-cacheable,
+  browser credentials are not forwarded upstream, and deployment-owner controls
+  are recorded in `docs/SECURITY.md`.
+- Gated image publishing on the complete reusable test workflow, required an
+  immutable production image reference, and added API-aware container health.
 
 ### 2026-08-13
 

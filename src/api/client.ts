@@ -11,7 +11,7 @@ import type {
   SolutionTotalOut,
   SummaryOut,
 } from "./types";
-import { persistTable, readPersistedTable } from "./persistentTableCache";
+import "./browserDataRetention";
 import { currentMill, demoMode } from "../config/currentMill";
 import { demoMockTables } from "./mockDemoData";
 
@@ -144,17 +144,8 @@ async function fetchTable<T>(table: string): Promise<T[]> {
   const rowCount = counts.get(tableName);
   if (typeof rowCount !== "number") throw new ResponseFormatError();
 
-  const persisted = await readPersistedTable<T>(table);
-  if (persisted && persisted.rowCount === rowCount && persisted.rows.length === rowCount) return persisted.rows;
-
-  const canAppend = Boolean(
-    persisted && persisted.rowCount < rowCount && persisted.rows.length === persisted.rowCount,
-  );
-  const existingRows = canAppend ? persisted!.rows : [];
-  const newRows = await fetchTableRows<T>(table, existingRows.length, rowCount);
-  const rows = [...existingRows, ...newRows];
+  const rows = await fetchTableRows<T>(table, 0, rowCount);
   if (rows.length !== rowCount) throw new ResponseFormatError();
-  void persistTable({ table, rowCount, rows });
   return rows;
 }
 

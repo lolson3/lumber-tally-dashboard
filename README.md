@@ -147,7 +147,7 @@ configured upstream.
 
 The repository includes `docker/compose.yaml` for pulling and running the
 published GHCR image. Keep deployment values in an ignored `docker/.env` file,
-and pin `DASHBOARD_IMAGE` to a commit-specific tag or digest in production:
+and set the required `DASHBOARD_IMAGE` to a commit-specific tag or digest:
 
 ```bash
 cp docker/.env.example docker/.env
@@ -155,12 +155,16 @@ docker compose --env-file docker/.env -f docker/compose.yaml pull
 docker compose --env-file docker/.env -f docker/compose.yaml up -d
 ```
 
+Every successful main-branch publish records the immutable `image@sha256:...`
+reference in its GitHub Actions job summary. Prefer that value for TrueNAS.
+
 Compose defaults to the safe demo mode, the Agwood visual profile, host port
 8080, and a restart policy appropriate for a long-running appliance. Configure
 the deployment with environment variables in TrueNAS or a repository-adjacent
 `.env` file:
 
 ```dotenv
+DASHBOARD_IMAGE=ghcr.io/lolson3/lumber-tally-dashboard:COMMIT_SHA
 DEMO_MODE=true
 MILL_ID=agwood
 DASHBOARD_HOST_PORT=8080
@@ -170,8 +174,22 @@ FAKE_DATA_SEED=demo-seed-v1
 No volume is required: demo fixtures are recreated inside the container on each
 start. To connect real data, set `DEMO_MODE=false` and provide an API URL that is
 reachable from the container. The Compose service drops Linux capabilities,
-prevents privilege escalation, and exposes `/healthz` through the image health
-check for TrueNAS to monitor.
+prevents privilege escalation, and provides a dependency-aware image health
+check for TrueNAS. It first checks nginx through `/healthz`; real Sequoia and
+North Fork profiles must also reach their configured API health resource. Demo
+and in-process mock profiles have no external API dependency.
+
+`/healthz` remains a liveness diagnostic and can still return 200 while an API
+is unavailable. `/readyz` and the Docker container health status include the API
+dependency and are the production readiness signals. If TrueNAS uses an HTTP
+health probe instead of Docker image health, configure it to request `/readyz`.
+Plain Docker Compose reports an unhealthy container but does not restart it
+solely because of that status; configure any desired recovery behavior in
+TrueNAS.
+
+Production access is restricted to the intended local network and uses the
+TrueNAS IP and configured host port. Do not create a public DNS route or router
+port-forwarding rule. See [the production security baseline](docs/SECURITY.md).
 
 ### API configuration
 
@@ -258,8 +276,10 @@ npm run test:all
 ```
 
 `test:all` runs the Vitest suite, performs a TypeScript production build, and
-executes the Playwright desktop and mobile workflows. The same pipeline is
-configured for GitHub Actions.
+executes the Playwright desktop and mobile workflows. The GitHub release gate
+also builds the production container, verifies its security behavior, and proves
+that container health changes to unhealthy when the API disappears. Main-branch
+images are published only after this reusable gate succeeds.
 
 Run the read-only live SFP contract and performance gate from a machine that
 can reach the configured private API:
@@ -294,7 +314,9 @@ macOS, Android, iOS, iPadOS, ChromeOS, and Linux, subject to each platform's
 browser support. The installed shell can launch without a connection, while
 live production data still requires access to the Bronze API. API responses are
 deliberately excluded from offline caches so operational data is never presented
-as current after becoming stale.
+as current after becoming stale. All profiles keep table data out of IndexedDB;
+their data cache exists only in browser memory, and startup removes databases
+created by older releases.
 
 Build and serve the application normally, then use the browser's **Install app**
 or **Add to Home Screen** action. Service workers require a secure context:
@@ -327,6 +349,7 @@ src/
 docs/
   SFP_API.md            Sequoia Forest Products API integration contract
   NFL_API.md            North Fork Lumber API integration contract
+  SECURITY.md           LAN-only production security baseline and checks
 public/
   img/                  Mill logos and favicon
   icons/                Standard, maskable, and Apple installation icons
@@ -342,9 +365,11 @@ vite.config.ts          Build config and generated PWA manifest
   aggregates, which requires the client to retrieve and process complete source
   tables.
 - Initial load time depends on the API's response latency and dataset size.
-- Authentication and authorization are not currently defined by the API.
-- A production deployment still needs an agreed hosting environment, HTTPS and
-  network policy, monitoring, and operational support procedures.
+- Access is restricted by the deployment-owned LAN and firewall policy described
+  in [the security baseline](docs/SECURITY.md); the application does not maintain
+  user accounts.
+- Production still requires the deployment owner to apply and verify the
+  documented network, TrueNAS, monitoring, and support controls.
 - Automated tests use deterministic API fixtures; validation against the live
   environment remains part of deployment acceptance.
 

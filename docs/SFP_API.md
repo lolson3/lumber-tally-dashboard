@@ -69,11 +69,14 @@ The API exposes source tables rather than dashboard-specific aggregates.
   `report_datetime`;
 - calculates solution, reject-reason, grade, and dimension totals locally;
 - fetches required pages concurrently and shares requests between panels; and
-- caches completed table reads in memory for one minute;
-- persists the compact domain rows in IndexedDB; and
-- refreshes table counts after the one-minute dataset cache expires, reusing
-  unchanged tables and requesting only appended offsets when rows have been
-  added. A reduced or inconsistent row count causes a safe full-table rebuild.
+- caches completed table reads in memory for one minute; and
+- refreshes table counts and refetches tables after the one-minute dataset cache
+  expires. Bronze rows are never persisted in IndexedDB, and the application
+  removes databases created by older releases.
+
+The nginx production proxy accepts only `GET` and `HEAD`, marks API responses
+`no-store`, and strips browser authorization and Cookie headers before
+forwarding requests upstream.
 
 The date field and inclusivity above are application behavior. The upstream API
 does not currently provide server-side date filtering.

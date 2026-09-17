@@ -65,6 +65,19 @@ case "$dashboard_api_base" in
     exit 1
     ;;
 esac
+if printf '%s' "$dashboard_api_base" | grep -Eq '[[:space:]]'; then
+  echo "ERROR: TALLY_API_BASE_URL must not contain whitespace." >&2
+  exit 1
+fi
+
+if [ "$dashboard_demo_mode" = true ] || [ "$dashboard_mill_id" = agwood ]; then
+  dashboard_health_target="http://127.0.0.1:${dashboard_port}/healthz"
+else
+  case "$dashboard_mill_id" in
+    sequoia) dashboard_health_target="${dashboard_api_base}/api/bronze/tables" ;;
+    north-fork) dashboard_health_target="${dashboard_api_base}/health" ;;
+  esac
+fi
 
 manifest_source="/usr/share/nginx/html/manifests/$dashboard_mill_id.webmanifest"
 if [ ! -f "$manifest_source" ]; then
@@ -78,3 +91,4 @@ window.__LUMBER_TALLY_CONFIG__ = {"millId":"$dashboard_mill_id","demoMode":$dash
 EOF
 
 export TALLY_API_BASE_URL="$dashboard_api_base"
+export DASHBOARD_HEALTH_TARGET="$dashboard_health_target"
