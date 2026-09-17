@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-import { getMillProfile } from "./src/config/mills";
+import { getMillProfile, millProfiles } from "./src/config/mills";
 
 function manifestForMill(mill: ReturnType<typeof getMillProfile>) {
   return JSON.stringify({
@@ -73,6 +73,13 @@ export default defineConfig(({ mode }) => {
       },
       generateBundle() {
         this.emitFile({ type: "asset", fileName: "manifest.webmanifest", source: millManifest });
+        for (const profile of Object.values(millProfiles)) {
+          this.emitFile({
+            type: "asset",
+            fileName: `manifests/${profile.id}.webmanifest`,
+            source: manifestForMill(profile),
+          });
+        }
       },
     }],
     server: { port: dashboardPort, strictPort: true, allowedHosts, ...(proxy ? { proxy } : {}) },

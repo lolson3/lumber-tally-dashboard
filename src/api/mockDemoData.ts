@@ -1,7 +1,9 @@
+import { runtimeFakeDataSeed } from "../config/runtimeConfig";
+
 // Deterministic, in-memory demo data. Generating it at module load keeps a
 // checkout clean while ensuring every demo includes today and the prior 89 days.
 const reportCount = 90;
-const seedText = import.meta.env.VITE_FAKE_DATA_SEED || "demo-seed-v1";
+const seedText = runtimeFakeDataSeed;
 let randomState = [...seedText].reduce(
   (hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16_777_619),
   2_166_136_261,

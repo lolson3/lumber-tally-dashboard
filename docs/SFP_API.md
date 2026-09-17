@@ -1,8 +1,9 @@
 # Sequoia Forest Products API integration
 
-The Sequoia profile reads tally data from the current Bronze API. Its profile
-provides the default upstream origin; `VITE_TALLY_API_BASE_URL` can override it
-for a deployment. Browser requests use Vite's same-origin `/api` proxy.
+The Sequoia profile reads tally data from the current Bronze API. The production
+container reads `TALLY_API_BASE_URL` (or `SFP_API_BASE_URL`) at startup, while
+local Vite development uses `VITE_TALLY_API_BASE_URL`. Browser requests always
+use the same-origin `/api` proxy.
 
 The service is read-only from this application's perspective. No credentials or
 public production hostnames belong in this repository.
@@ -80,8 +81,10 @@ does not currently provide server-side date filtering.
 ## Configuration
 
 ```dotenv
-VITE_TALLY_API_BASE_URL=http://tally-api-host:7304
+DEMO_MODE=false
+MILL_ID=sequoia
+TALLY_API_BASE_URL=http://tally-api-host:7304
 ```
 
-Restart the Vite development or preview server after changing the value. The
-configured service must be reachable from the machine running that server.
+Restart the container after changing a runtime value. The configured service
+must be reachable from the container network.

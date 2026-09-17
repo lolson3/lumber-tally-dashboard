@@ -2,9 +2,10 @@
 
 set -eu
 
-# Always run from the dashboard directory, including under a scheduler.
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-cd "$SCRIPT_DIR"
+# Always run from the repository root, including under a scheduler.
+BIN_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR=$(CDPATH= cd -- "$BIN_DIR/.." && pwd)
+cd "$PROJECT_DIR"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: Node.js is not installed or is not available in PATH." >&2

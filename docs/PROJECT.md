@@ -16,10 +16,10 @@ belong in the [README](../README.md), while endpoint details belong in the
 | Application | Responsive, read-only React dashboard |
 | Supported PLC | Board Edger |
 | API | Bronze tally table API |
-| Deployment | Local/private-network static application; final host undecided |
+| Deployment | Published Docker image on TrueNAS with nginx and Cloudflare Tunnel planned |
 | Test coverage | Unit, component, API integration, accessibility, and Playwright workflows |
-| Containerization | Not used; native deployment remains preferred |
-| Last reviewed | 2026-08-12 |
+| Containerization | Multi-stage Node build with an nginx production runtime |
+| Last reviewed | 2026-09-17 |
 
 The dashboard is suitable for demonstrations and stakeholder review. Production
 release still requires deployment hardening, an agreed security model,
@@ -121,13 +121,13 @@ resolve independently rather than waiting for the detail-line table.
 Browser
   ├── static React application
   └── same-origin /api requests
-          └── web-server or Vite proxy
+          └── nginx production proxy or local Vite proxy
                   └── Bronze tally API
 ```
 
 The frontend is built as static assets. Vite provides the `/api` proxy during
-development and preview. A production web server must provide equivalent SPA
-routing and reverse-proxy behavior.
+development and preview. The published production image uses nginx for static
+assets, SPA routing, security headers, health checks, and `/api` proxying.
 
 The production entry point registers a same-origin service worker. It precaches
 the generated application shell and static assets, supplies an offline fallback,
@@ -164,9 +164,19 @@ src/
   main.tsx              React and QueryClient bootstrap
   styles.css            Global responsive visual system
 public/
+  img/                  Runtime-selected mill logos and favicon
   icons/                Platform and maskable installation icons
   offline.html          Offline navigation fallback
   sw.js                 Static application-shell caching; API requests bypassed
+docker/
+  Dockerfile             Multi-stage Node build and nginx runtime image
+  Dockerfile.dockerignore  Root-context exclusions for the Dockerfile
+  compose.yaml           Published-image TrueNAS service definition
+  nginx.conf.template   Production static server and API proxy configuration
+  15-dashboard-runtime.envsh  Validated container startup configuration
+bin/
+  start.bat             Windows development/demo launcher
+  start.sh              Unix development/demo launcher
 vite.config.ts          Build config and mill-specific PWA manifest generation
 ```
 
@@ -176,11 +186,16 @@ Utilities own reusable calculations that do not depend on React.
 
 ## Configuration and deployment
 
-Each mill profile supplies a default upstream API origin for the Vite proxy.
-`VITE_TALLY_API_BASE_URL` optionally overrides that origin for a deployment.
-`VITE_MILL_ID` selects the typed `sequoia` or `north-fork` profile in
-`src/config/mills.ts`, which owns branding, theme, timezone, icons, PLC defaults,
-and generated PWA metadata.
+Production containers select the `sequoia`, `north-fork`, or `agwood` profile at
+startup with `MILL_ID`. The entrypoint validates runtime settings, writes the
+browser-safe `runtime-config.js`, selects the matching prebuilt PWA manifest,
+and configures nginx with `TALLY_API_BASE_URL`. The same immutable image can
+therefore serve every mill without rebuilding it. Real mill deployments fail
+startup when demo mode is disabled without a reachable API origin.
+
+Local Vite development continues to use `VITE_MILL_ID` and
+`VITE_TALLY_API_BASE_URL`. The selected profile in `src/config/mills.ts` owns
+branding, theme, timezone, icons, PLC defaults, and generated PWA metadata.
 `VITE_DASHBOARD_PORT` selects the development and preview server port and
 defaults to `5173`; strict port binding prevents scheduled launches from moving
 silently to a different address.
@@ -189,15 +204,16 @@ reverse-proxy hostnames, including `tally.biztechro.com` by default.
 Deployment-specific values belong in ignored environment files or host
 configuration, not source control.
 
-The expected native deployment process is:
+The expected production deployment process is:
 
-1. Install a supported Node.js release on the build machine.
-2. Run `npm ci` and `npm run test:all`.
-3. Produce static assets with `npm run build`.
-4. Serve `dist/` using the selected production web server.
-5. Configure SPA fallback and reverse-proxy `/api` to the Bronze API.
+1. Run `npm ci` and `npm run test:all` in CI.
+2. Build and publish the multi-stage image from the verified commit.
+3. Pin that image version in the TrueNAS application.
+4. Configure the mill, demo mode, and API origin at container startup.
+5. Route Cloudflare Tunnel to nginx port 8080 and protect the hostname with the
+   agreed Access policy.
 6. Restrict inbound access using host firewall and network policy.
-7. Add HTTPS, authentication, logging, and monitoring as required by the agreed
+7. Add logging, monitoring, and rollback procedures required by the agreed
    production environment.
 
 Vite preview is only a build-verification server, not the recommended production
@@ -225,11 +241,11 @@ npm run test:all
 
 It currently runs:
 
-- 23 Vitest tests across API behavior, calculations, components, dashboard
+- 30 Vitest tests across API behavior, calculations, components, dashboard
   workflows, and accessibility.
 - TypeScript project compilation and a Vite production build.
-- Two Playwright workflows covering the primary desktop flow and mobile
-  navigation.
+- Nine Playwright workflows covering production, PWA, persistence, desktop, and
+  mobile behavior.
 
 Playwright uses deterministic Bronze API fixtures. GitHub Actions runs the same
 pipeline on pushes and pull requests. Live API compatibility must still be
@@ -247,7 +263,7 @@ verified as part of deployment acceptance.
 
 ### AD-002: Same-origin API proxy
 
-- **Status:** Accepted and implemented for development and preview.
+- **Status:** Accepted and implemented for development and production.
 - **Decision:** Browser requests use `/api`; the serving layer forwards them to
   the configured upstream API.
 - **Reason:** Avoid browser CORS coupling and keep the upstream origin out of UI
@@ -285,11 +301,20 @@ verified as part of deployment acceptance.
 
 - **Status:** Accepted and implemented.
 - **Decision:** Provide a repository-owned Dockerfile and Compose definition,
-  defaulting to the isolated Agwood demo configuration.
-- **Reason:** The target TrueNAS environment builds directly from the repository
-  and requires repeatable startup, health monitoring, and safe configuration.
+  defaulting to the isolated Agwood demo configuration. CI publishes a
+  multi-stage image whose final nginx layer contains only production assets.
+- **Reason:** The target TrueNAS environment runs published images and requires
+  repeatable startup, health monitoring, and safe runtime configuration.
 - **Consequence:** Real-data deployments must explicitly disable demo mode and
   provide an API origin reachable from the container.
+
+### AD-009: One runtime-configurable image
+
+- **Status:** Accepted and implemented.
+- **Decision:** Build every mill profile and manifest into one image, then select
+  the active profile and API proxy origin through validated startup variables.
+- **Reason:** All businesses receive the same tested artifact without long-lived
+  branches or profile-specific image drift.
 
 ### AD-007: No external runtime assets
 
@@ -310,7 +335,7 @@ verified as part of deployment acceptance.
 
 | Question | Why it matters |
 |---|---|
-| Which operating system and web server will host the application? | Determines service, proxy, deployment, and update procedures. |
+| Which TrueNAS release will host the published image? | Determines the exact Custom App and Compose deployment workflow. |
 | Will the dashboard and API share a host? | Determines firewall rules, proxy routing, and failure boundaries. |
 | Which users and devices may access the dashboard? | Determines authentication and authorization requirements. |
 | Is local HTTPS required? | Determines certificate issuance and client trust configuration. |
@@ -340,6 +365,15 @@ verified as part of deployment acceptance.
 | `.github/workflows/test.yml` | Continuous verification pipeline |
 
 ## Recent milestones
+
+### 2026-09-17
+
+- Replaced the container's Vite development runtime with a multi-stage build and
+  nginx production server.
+- Added validated runtime mill/demo configuration, runtime API proxy selection,
+  profile-specific PWA manifests, security headers, and `/healthz` monitoring.
+- Preserved a single reusable image for Agwood demo, Sequoia, and North Fork
+  deployments.
 
 ### 2026-08-13
 

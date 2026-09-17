@@ -1,0 +1,80 @@
+#!/bin/sh
+
+# This file is sourced by the official nginx entrypoint before it expands the
+# nginx configuration template, so exported values remain available to envsubst.
+
+dashboard_port="${DASHBOARD_PORT:-8080}"
+case "$dashboard_port" in
+  ""|*[!0-9]*)
+    echo "ERROR: DASHBOARD_PORT must be an integer between 1024 and 65535." >&2
+    exit 1
+    ;;
+esac
+if [ "$dashboard_port" -lt 1024 ] || [ "$dashboard_port" -gt 65535 ]; then
+  echo "ERROR: DASHBOARD_PORT must be an integer between 1024 and 65535." >&2
+  exit 1
+fi
+
+dashboard_mill_id="${MILL_ID:-${VITE_MILL_ID:-agwood}}"
+case "$dashboard_mill_id" in
+  sequoia|north-fork|agwood) ;;
+  *)
+    echo "ERROR: MILL_ID must be sequoia, north-fork, or agwood." >&2
+    exit 1
+    ;;
+esac
+
+case "${DEMO_MODE:-true}" in
+  true|TRUE|1|yes|YES) dashboard_demo_mode=true ;;
+  false|FALSE|0|no|NO) dashboard_demo_mode=false ;;
+  *)
+    echo "ERROR: DEMO_MODE must be true or false." >&2
+    exit 1
+    ;;
+esac
+
+dashboard_seed="${FAKE_DATA_SEED:-demo-seed-v1}"
+if ! printf '%s' "$dashboard_seed" | grep -Eq '^[A-Za-z0-9._-]{1,128}$'; then
+  echo "ERROR: FAKE_DATA_SEED must contain 1-128 letters, numbers, dots, underscores, or hyphens." >&2
+  exit 1
+fi
+
+dashboard_api_base="${TALLY_API_BASE_URL:-${VITE_TALLY_API_BASE_URL:-}}"
+if [ -z "$dashboard_api_base" ]; then
+  case "$dashboard_mill_id" in
+    sequoia) dashboard_api_base="${SFP_API_BASE_URL:-${VITE_SFP_API_BASE_URL:-}}" ;;
+    north-fork) dashboard_api_base="${NFL_API_BASE_URL:-${VITE_NFL_API_BASE_URL:-}}" ;;
+  esac
+fi
+
+if [ "$dashboard_demo_mode" = false ] && [ "$dashboard_mill_id" != agwood ] && [ -z "$dashboard_api_base" ]; then
+  echo "ERROR: TALLY_API_BASE_URL is required for a non-demo mill deployment." >&2
+  exit 1
+fi
+
+# Demo mode never calls the proxy, but nginx still requires a syntactically
+# valid upstream while loading its configuration.
+dashboard_api_base="${dashboard_api_base:-http://127.0.0.1:9}"
+while [ "${dashboard_api_base%/}" != "$dashboard_api_base" ]; do
+  dashboard_api_base="${dashboard_api_base%/}"
+done
+case "$dashboard_api_base" in
+  http://*|https://*) ;;
+  *)
+    echo "ERROR: TALLY_API_BASE_URL must be an http:// or https:// URL." >&2
+    exit 1
+    ;;
+esac
+
+manifest_source="/usr/share/nginx/html/manifests/$dashboard_mill_id.webmanifest"
+if [ ! -f "$manifest_source" ]; then
+  echo "ERROR: Missing web manifest for mill profile '$dashboard_mill_id'." >&2
+  exit 1
+fi
+
+cp "$manifest_source" /usr/share/nginx/html/manifest.webmanifest
+cat > /usr/share/nginx/html/runtime-config.js <<EOF
+window.__LUMBER_TALLY_CONFIG__ = {"millId":"$dashboard_mill_id","demoMode":$dashboard_demo_mode,"fakeDataSeed":"$dashboard_seed"};
+EOF
+
+export TALLY_API_BASE_URL="$dashboard_api_base"

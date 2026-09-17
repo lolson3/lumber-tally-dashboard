@@ -1,4 +1,5 @@
-const CACHE_NAME = "lumber-tally-shell-v1";
+const CACHE_NAME = "lumber-tally-shell-v2";
+const RUNTIME_METADATA_PATHS = new Set(["/runtime-config.js", "/manifest.webmanifest"]);
 const APP_SHELL = [
   "/",
   "/offline.html",
@@ -45,6 +46,21 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+
+  if (RUNTIME_METADATA_PATHS.has(url.pathname)) {
+    event.respondWith(
+      fetch(request, { cache: "no-store" })
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+          }
+          return response;
+        })
+        .catch(async () => (await caches.match(request)) || Response.error()),
+    );
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(

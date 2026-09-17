@@ -98,10 +98,10 @@ configured mill profile, and
 serves the dashboard at `http://localhost:5173/`:
 
 ```bash
-FAKE_DATA_SEED=my-demo sh ./start.sh -demo
+FAKE_DATA_SEED=my-demo sh ./bin/start.sh -demo
 ```
 
-On Windows, run `start.bat -demo`. Demo mode overrides every profile's API
+On Windows, run `bin\start.bat -demo`. Demo mode overrides every profile's API
 adapter with the in-process fixture implementation, so it makes no `/api`
 requests. Each run generates reports for the latest 90 calendar days, including
 the day it starts. Running either launcher without the tag does not generate
@@ -112,79 +112,100 @@ data and uses the configured mill and upstream API.
 Build the runtime image:
 
 ```bash
-docker build -t lumber-tally-dashboard .
+docker build -f docker/Dockerfile -t lumber-tally-dashboard .
 ```
 
 Run it safely with generated demo data:
 
 ```bash
-docker run --rm --init -p 5173:5173 lumber-tally-dashboard
+docker run --rm --init -p 8080:8080 lumber-tally-dashboard
 ```
 
 With no overrides, the image uses Agwood branding, generates the latest 90 days,
-replaces the data adapter with the in-process fixture, and disables the Vite API
-proxy entirely. Set `VITE_MILL_ID` to `sequoia` or `north-fork` to retain that
-profile's branding with the same fake data.
+and replaces the data adapter with the in-process fixture. Set `MILL_ID` to
+`sequoia` or `north-fork` to retain that profile's branding with the same fake
+data. Mill selection happens when the container starts, so the same published
+image can be used for every deployment.
 
-For a real API, omit `-demo` and provide the mill and an API origin reachable
-from inside the container:
+For a real API, disable demo mode and provide the mill and an API origin
+reachable from inside the container:
 
 ```bash
-docker run --rm --init -p 5173:5173 \
+docker run --rm --init -p 8080:8080 \
   -e DEMO_MODE=false \
-  -e VITE_MILL_ID=sequoia \
-  -e VITE_TALLY_API_BASE_URL=http://host.docker.internal:7304 \
+  -e MILL_ID=sequoia \
+  -e TALLY_API_BASE_URL=http://host.docker.internal:7304 \
   lumber-tally-dashboard
 ```
 
 Do not use `127.0.0.1` for a service running on the Docker host; inside the
-container it refers to the dashboard container itself. Set
-`VITE_ALLOWED_HOSTS` when accessing the dashboard through a custom hostname.
+container it refers to the dashboard container itself. Nginx serves the static
+production bundle on port 8080 and proxies same-origin `/api` requests to the
+configured upstream.
 
 #### TrueNAS / repository deployment
 
-The repository includes `compose.yaml`, so a host that checks out or updates the
-repository can build and replace the container without maintaining external
-Docker configuration:
+The repository includes `docker/compose.yaml` for pulling and running the
+published GHCR image. Keep deployment values in an ignored `docker/.env` file,
+and pin `DASHBOARD_IMAGE` to a commit-specific tag or digest in production:
 
 ```bash
-docker compose up -d --build
+cp docker/.env.example docker/.env
+docker compose --env-file docker/.env -f docker/compose.yaml pull
+docker compose --env-file docker/.env -f docker/compose.yaml up -d
 ```
 
 Compose defaults to the safe demo mode, the Agwood visual profile, host port
-5173, and a restart policy appropriate for a long-running appliance. Configure
+8080, and a restart policy appropriate for a long-running appliance. Configure
 the deployment with environment variables in TrueNAS or a repository-adjacent
 `.env` file:
 
 ```dotenv
 DEMO_MODE=true
-VITE_MILL_ID=agwood
-DASHBOARD_HOST_PORT=5173
-VITE_ALLOWED_HOSTS=tally.example.internal
+MILL_ID=agwood
+DASHBOARD_HOST_PORT=8080
 FAKE_DATA_SEED=demo-seed-v1
 ```
 
 No volume is required: demo fixtures are recreated inside the container on each
 start. To connect real data, set `DEMO_MODE=false` and provide an API URL that is
-reachable from the container. The container runs as an unprivileged user,
-drops Linux capabilities, prevents privilege escalation, and exposes a health
+reachable from the container. The Compose service drops Linux capabilities,
+prevents privilege escalation, and exposes `/healthz` through the image health
 check for TrueNAS to monitor.
 
 ### API configuration
 
-Copy the example environment file:
+Copy the production container environment template:
 
 ```bash
-cp .env.example .env.local
+cp docker/.env.example docker/.env
 ```
 
 PowerShell equivalent:
 
 ```powershell
-Copy-Item .env.example .env.local
+Copy-Item docker/.env.example docker/.env
 ```
 
-Set the upstream API origin in `.env.local`:
+For the nginx production container, use runtime variables:
+
+```dotenv
+DEMO_MODE=false
+MILL_ID=sequoia
+TALLY_API_BASE_URL=http://tally-api-host:7304
+DASHBOARD_HOST_PORT=8080
+```
+
+`MILL_ID` selects a typed branding and operational profile. Available profiles
+are `sequoia`, `north-fork`, and `agwood`. Profiles control the company name,
+theme, icons, timezone, PLC availability, date defaults, API adapter, and PWA
+manifest. `TALLY_API_BASE_URL` overrides the selected mill-specific API origin.
+`SFP_API_BASE_URL` and `NFL_API_BASE_URL` can instead provide reusable defaults.
+Non-demo Sequoia and North Fork containers fail startup when no API origin is
+configured.
+
+Local Vite development instead uses the corresponding build-time variables in
+a root `.env.local` file:
 
 ```dotenv
 VITE_TALLY_API_BASE_URL=http://tally-api-host:7304
@@ -193,19 +214,15 @@ VITE_DASHBOARD_PORT=5173
 VITE_ALLOWED_HOSTS=tally.biztechro.com
 ```
 
+Start from the tracked template with `cp .env.example .env.local` or
+`Copy-Item .env.example .env.local` in PowerShell.
+
 `VITE_DASHBOARD_PORT` controls both the development/start server and the preview
 server. It defaults to `5173` when omitted and must be an available port from 1
 through 65535.
 
-`VITE_MILL_ID` selects a typed branding and operational profile. Available
-profiles are `sequoia` and `north-fork`. Profiles control the company name,
-dashboard name, theme colors, icons, timezone, enabled PLCs, default API origin,
-and generated PWA manifest. `VITE_TALLY_API_BASE_URL` can override the selected
-profile's default API for a particular deployment.
-
 `VITE_ALLOWED_HOSTS` is a comma-separated list of hostnames permitted to access
-the Vite server. Add each reverse-proxy or DNS hostname without a protocol or
-port, for example `tally.biztechro.com,dashboard.internal.example`.
+the local Vite server. It is not used by the nginx production container.
 
 Environment files are ignored by Git. Do not commit credentials or private
 deployment addresses.
@@ -253,8 +270,9 @@ npm run preview
 
 The compiled static assets are written to `dist/`, and the preview server is
 available at `http://localhost:5173` by default. Vite preview is intended for
-build verification; a production deployment should use an appropriate static
-web server and reverse-proxy configuration.
+build verification. The production Docker image uses a multi-stage build and
+copies only `dist/` into its nginx runtime stage; Node.js, source files, and
+development dependencies are not included in the final image.
 
 ## Installable app (PWA)
 
@@ -272,10 +290,10 @@ or **Add to Home Screen** action. Service workers require a secure context:
 served through trusted HTTPS. For private-network deployment, place the running
 dashboard behind an HTTPS reverse proxy with SPA fallback and `/api` forwarding.
 
-The root [start.bat](start.bat) and [start.sh](start.sh) launchers are suitable
-for a scheduler or service manager, but they start Vite over HTTP. An HTTPS proxy
-is therefore still required for installation from phones, tablets, and other
-LAN devices.
+The [Windows](bin/start.bat) and [Unix](bin/start.sh) launchers are suitable for
+a scheduler or service manager, but they start Vite over HTTP. An HTTPS proxy is
+therefore still required for installation from phones, tablets, and other LAN
+devices.
 
 ## Project structure
 
@@ -298,6 +316,7 @@ docs/
   SFP_API.md            Sequoia Forest Products API integration contract
   NFL_API.md            North Fork Lumber API integration contract
 public/
+  img/                  Mill logos and favicon
   icons/                Standard, maskable, and Apple installation icons
   offline.html          Offline navigation fallback
   sw.js                 Application-shell service worker

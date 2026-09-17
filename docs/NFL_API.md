@@ -5,10 +5,10 @@ screenshots captured on 2026-08-21. The service exposes read-only health,
 ingestion-history, summary, and Bronze-table browsing endpoints for the
 `porter` and `tally` sources.
 
-The screenshots use a private-network HTTP origin. Configure the appropriate
-origin through the dashboard's `north-fork` profile or override it with
-`VITE_NFL_API_BASE_URL`. Browser requests should continue through the
-dashboard's same-origin `/api` proxy.
+The screenshots use a private-network HTTP origin. Production containers read
+`TALLY_API_BASE_URL` or `NFL_API_BASE_URL` at startup; local Vite development
+uses `VITE_NFL_API_BASE_URL`. Browser requests continue through the dashboard's
+same-origin `/api` proxy.
 
 All row counts, identifiers, filenames, and timestamps below are examples from
 the captured responses. They describe that snapshot and are not fixed values.

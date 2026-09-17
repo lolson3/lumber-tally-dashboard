@@ -8,3 +8,11 @@ interface ImportMetaEnv {
   readonly VITE_SFP_API_BASE_URL?: string;
   readonly VITE_NFL_API_BASE_URL?: string;
 }
+
+interface Window {
+  __LUMBER_TALLY_CONFIG__?: {
+    millId?: "sequoia" | "north-fork" | "agwood";
+    demoMode?: boolean;
+    fakeDataSeed?: string;
+  };
+}

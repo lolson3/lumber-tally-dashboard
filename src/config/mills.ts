@@ -1,5 +1,6 @@
-const nflLogo = new URL("../../img/nfl-logo-enhanced.png", import.meta.url).href;
-const agwoodLogo = new URL("../../img/AML-logo-white.png", import.meta.url).href;
+const sfpLogo = "/img/sfp-logo.png";
+const nflLogo = "/img/nfl-logo-enhanced.png";
+const agwoodLogo = "/img/AML-logo-white.png";
 
 export const allPlcs = [
   "Board Edger", "Chopsaw", "Twin", "BakerInFeed", "Single", "Gang",
@@ -65,6 +66,7 @@ export const millProfiles: Record<MillId, MillProfile> = {
     defaultPlc: "Board Edger",
     initialReportRange: "recent",
     enabledPlcs: ["Board Edger"],
+    logo: sfpLogo,
     icons: sharedIcons,
     theme: { primary: "#dc5b08", primarySoft: "#ffe0cc", accent: "#f47700", metric: "#f47700", action: "#c84f00", focus: "#f47700", sidebarText: "#ffe1cc", themeColor: "#102a27", background: "#f4f0e6" },
   },

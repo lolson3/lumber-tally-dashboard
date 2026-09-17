@@ -1,8 +1,8 @@
 @echo off
 setlocal
 
-rem Always run from the dashboard directory, including under Task Scheduler.
-cd /d "%~dp0" || exit /b 1
+rem Always run from the repository root, including under Task Scheduler.
+cd /d "%~dp0.." || exit /b 1
 
 where node >nul 2>&1 || (
   echo ERROR: Node.js is not installed or is not available in PATH.

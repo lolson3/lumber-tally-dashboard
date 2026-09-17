@@ -12,7 +12,7 @@ import type {
   SummaryOut,
 } from "./types";
 import { persistTable, readPersistedTable } from "./persistentTableCache";
-import { currentMill } from "../config/currentMill";
+import { currentMill, demoMode } from "../config/currentMill";
 import { demoMockTables } from "./mockDemoData";
 
 const API_ROOT = "/api/bronze";
@@ -369,6 +369,6 @@ const demoMockApi: typeof bronzeTallyApi = {
 
 // Demo mode is a build-time hard override: no profile can reach a real API
 // while the launcher is running with -demo.
-export const tallyApi = import.meta.env.VITE_DEMO_MODE === "true" || currentMill.api.adapter === "mock"
+export const tallyApi = demoMode || currentMill.api.adapter === "mock"
   ? demoMockApi
   : bronzeTallyApi;

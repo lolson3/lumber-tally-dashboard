@@ -148,7 +148,7 @@ test("publishes install metadata and activates its service worker", async ({ pag
   });
   expect(serviceWorkerScope).toBe(new URL("/", page.url()).href);
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
-  const cachedUrls = await page.evaluate(async () => (await caches.open("lumber-tally-shell-v1")).keys().then((requests) => requests.map((request) => request.url)));
+  const cachedUrls = await page.evaluate(async () => (await caches.open("lumber-tally-shell-v2")).keys().then((requests) => requests.map((request) => request.url)));
   expect(cachedUrls.some((url) => /\/assets\/index-.*\.js$/.test(url))).toBe(true);
   expect(cachedUrls.some((url) => /\/assets\/index-.*\.css$/.test(url))).toBe(true);
 

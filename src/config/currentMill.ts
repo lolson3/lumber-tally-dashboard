@@ -1,7 +1,8 @@
 import { getMillProfile } from "./mills";
+import { runtimeDemoMode, runtimeMillId } from "./runtimeConfig";
 
-export const currentMill = getMillProfile(import.meta.env.VITE_MILL_ID);
-export const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
+export const currentMill = getMillProfile(runtimeMillId);
+export const demoMode = runtimeDemoMode;
 
 export function applyMillProfile() {
   const root = document.documentElement;
