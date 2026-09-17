@@ -24,9 +24,16 @@ COPY docker/healthcheck.sh /usr/local/bin/dashboard-healthcheck
 RUN sed -i 's/\r$//' /docker-entrypoint.d/15-dashboard-runtime.envsh \
     && sed -i 's/\r$//' /usr/local/bin/dashboard-healthcheck \
     && chmod +x /docker-entrypoint.d/15-dashboard-runtime.envsh /usr/local/bin/dashboard-healthcheck \
-    && mkdir -p /tmp/nginx/client_temp /tmp/nginx/proxy_temp \
-    && chown -R nginx:nginx /usr/share/nginx/html /etc/nginx/conf.d /tmp/nginx
-
+    && mkdir -p \
+        /tmp/nginx/client_temp \
+        /tmp/nginx/proxy_temp \
+        /tmp/nginx/fastcgi_temp \
+        /tmp/nginx/uwsgi_temp \
+        /tmp/nginx/scgi_temp \
+    && chown -R nginx:nginx \
+        /usr/share/nginx/html \
+        /etc/nginx/conf.d \
+        /tmp/nginx
 USER nginx
 
 EXPOSE 8080
