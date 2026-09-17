@@ -94,18 +94,23 @@ function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   return requestUrl<T>(`${API_ROOT}${path}`, signal);
 }
 
-let tableCountsPromise: Promise<Map<string, number>> | null = null;
+let tableCountsCache: { loadedAt: number; promise: Promise<Map<string, number>> } | null = null;
 
 function loadTableCounts(): Promise<Map<string, number>> {
-  if (!tableCountsPromise) {
-    tableCountsPromise = request<BronzeTablesResponse>("/tables")
-      .then(({ tables }) => new Map(tables.map((table) => [table.table_name, table.row_count])))
-      .catch((error) => {
-        tableCountsPromise = null;
-        throw error;
-      });
+  if (tableCountsCache && Date.now() - tableCountsCache.loadedAt <= DATASET_TTL_MS) {
+    return tableCountsCache.promise;
   }
-  return tableCountsPromise;
+
+  const entry = {
+    loadedAt: Date.now(),
+    promise: request<BronzeTablesResponse>("/tables")
+      .then(({ tables }) => new Map(tables.map((table) => [table.table_name, table.row_count]))),
+  };
+  tableCountsCache = entry;
+  entry.promise.catch(() => {
+    if (tableCountsCache === entry) tableCountsCache = null;
+  });
+  return entry.promise;
 }
 
 async function fetchTableRows<T>(table: string, startOffset: number, rowCount: number): Promise<T[]> {
@@ -156,7 +161,7 @@ async function fetchTable<T>(table: string): Promise<T[]> {
 const tableCache = new Map<string, { loadedAt: number; promise: Promise<unknown[]> }>();
 
 export function resetTallyApiCache() {
-  tableCountsPromise = null;
+  tableCountsCache = null;
   tableCache.clear();
 }
 

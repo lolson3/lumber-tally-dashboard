@@ -71,9 +71,9 @@ The API exposes source tables rather than dashboard-specific aggregates.
 - fetches required pages concurrently and shares requests between panels; and
 - caches completed table reads in memory for one minute;
 - persists the compact domain rows in IndexedDB; and
-- compares current table counts on a new visit, reusing unchanged tables and
-  requesting only appended offsets when rows have been added. A reduced or
-  inconsistent row count causes a safe full-table rebuild.
+- refreshes table counts after the one-minute dataset cache expires, reusing
+  unchanged tables and requesting only appended offsets when rows have been
+  added. A reduced or inconsistent row count causes a safe full-table rebuild.
 
 The date field and inclusivity above are application behavior. The upstream API
 does not currently provide server-side date filtering.

@@ -106,8 +106,8 @@ The client therefore:
 6. Calculates chart and table aggregates locally.
 7. Shares in-flight reads and caches completed tables for one minute.
 8. Persists approximately 1.4 MB of compact Bronze domain payloads in IndexedDB,
-   namespaced by mill profile, using current table counts to fetch only appended
-   rows on later visits.
+   namespaced by mill profile, refreshing table counts after the one-minute
+   cache expires and fetching only appended rows when counts increase.
 
 This approach reduced a measured full sequential load from approximately 52.5
 seconds to approximately 13 seconds on the observed network. Lightweight panels
@@ -241,7 +241,7 @@ npm run test:all
 
 It currently runs:
 
-- 30 Vitest tests across API behavior, calculations, components, dashboard
+- 31 Vitest tests across API behavior, calculations, components, dashboard
   workflows, and accessibility.
 - TypeScript project compilation and a Vite production build.
 - Nine Playwright workflows covering production, PWA, persistence, desktop, and
@@ -374,6 +374,8 @@ verified as part of deployment acceptance.
   profile-specific PWA manifests, security headers, and `/healthz` monitoring.
 - Preserved a single reusable image for Agwood demo, Sequoia, and North Fork
   deployments.
+- Expired Bronze table-count metadata with the one-minute dataset cache so new
+  rows become available without reloading the application.
 
 ### 2026-08-13
 

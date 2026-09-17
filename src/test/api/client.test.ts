@@ -40,7 +40,10 @@ function installFixtureApi() {
 
 describe("tallyApi bronze adapter", () => {
   beforeEach(resetTallyApiCache);
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it("reproduces date-filtered dashboard data and aggregations", async () => {
     const fetchMock = installFixtureApi();
@@ -85,6 +88,35 @@ describe("tallyApi bronze adapter", () => {
     const fetchMock = installFixtureApi();
     await Promise.all([tallyApi.files({ start: "", end: "" }), tallyApi.files({ start: "", end: "" })]);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/files?"))).toHaveLength(1);
+  });
+
+  it("refreshes table counts and loads appended rows after the cache expires", async () => {
+    vi.useFakeTimers();
+    const files = [
+      { file_id: 1, filename: "one.txt", filename_date: "2026-08-01", report_datetime: "2026-08-01 12:00:00" },
+      { file_id: 2, filename: "two.txt", filename_date: "2026-08-02", report_datetime: "2026-08-02 12:00:00" },
+    ];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/tables")) {
+        return json({ tables: [{ table_name: "tally__files", row_count: files.length }] });
+      }
+      if (url.includes("/files?")) return page(files);
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    await expect(tallyApi.files({ start: "", end: "" })).resolves.toHaveLength(2);
+    files.push({
+      file_id: 3,
+      filename: "three.txt",
+      filename_date: "2026-08-03",
+      report_datetime: "2026-08-03 12:00:00",
+    });
+    vi.advanceTimersByTime(60_001);
+
+    await expect(tallyApi.files({ start: "", end: "" })).resolves.toHaveLength(3);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/tables"))).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/files?"))).toHaveLength(2);
   });
 
   it("reports HTTP, network, malformed JSON, and metadata errors", async () => {
