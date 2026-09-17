@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
   const demoMode = mode === "demo";
   const isolatedTestMode = mode === "test" || mode === "e2e";
-  const mill = getMillProfile(isolatedTestMode ? "sequoia" : env.VITE_MILL_ID);
+  const mill = getMillProfile(isolatedTestMode ? "sequoia" : demoMode ? "cascade" : env.VITE_MILL_ID);
   const millManifest = manifestForMill(mill);
   const apiTarget = env.VITE_TALLY_API_BASE_URL || (mill.api.originEnv ? env[mill.api.originEnv] : "") || mill.api.defaultOrigin;
   const dashboardPort = Number(env.VITE_DASHBOARD_PORT || "5173");

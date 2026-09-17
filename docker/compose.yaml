@@ -9,7 +9,7 @@ services:
     environment:
       DEMO_MODE: "${DEMO_MODE:-true}"
       FAKE_DATA_SEED: "${FAKE_DATA_SEED:-demo-seed-v1}"
-      MILL_ID: "${MILL_ID:-agwood}"
+      MILL_ID: "${MILL_ID:-cascade}"
       DASHBOARD_PORT: "8080"
       TALLY_API_BASE_URL: "${TALLY_API_BASE_URL:-}"
       SFP_API_BASE_URL: "${SFP_API_BASE_URL:-}"

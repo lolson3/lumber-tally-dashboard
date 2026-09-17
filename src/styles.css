@@ -32,7 +32,7 @@ h2 { font-size: 1.16rem; letter-spacing: -0.025em; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
 .sidebar { background: var(--forest); color: white; min-height: 100vh; overflow: hidden; padding: 30px 20px 24px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; isolation: isolate; }
 .brand { color: white; display: flex; align-items: center; justify-content: center; font-family: "Brush Script MT", "Segoe Script", cursive; font-size: 1.4rem; font-weight: 600; letter-spacing: 0; line-height: 1.35; min-height: 92px; padding: 0 8px 30px; position: relative; text-align: center; text-decoration: none; width: 100%; z-index: 1; }
-.brand-logo { display: block; height: auto; max-height: 78px; max-width: 190px; object-fit: contain; width: auto; }
+.brand-logo { display: block; filter: var(--brand-logo-filter, none); height: auto; max-height: 78px; max-width: 190px; object-fit: contain; width: auto; }
 .brand-mobile-name { display: none; }
 .sidebar nav { display: grid; gap: 5px; position: relative; z-index: 1; }
 .menu-toggle { display: none; }

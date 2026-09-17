@@ -1,153 +1,161 @@
 # Lumber Tally Dashboard
 
-A responsive production dashboard for exploring lumber tally reports, operational
-summary metrics, product output, board mix, reject reasons, and complete source
-reports.
+A responsive, read-only production dashboard for exploring lumber tally data,
+operational summaries, product output, board mix, reject reasons, and individual
+source reports.
 
-> **Project status:** Functional demo. The application is approaching
-> production quality and includes automated unit, accessibility, build, and
-> browser testing, but deployment hardening and authentication requirements are
-> still being evaluated.
+The application is delivered as one runtime-configurable container image. A
+deployment selects its branding, operational profile, and upstream API when the
+container starts, allowing multiple facilities to use the same tested artifact
+without maintaining separate code branches or images.
 
-## Overview
+![Cascade Timber Works demo dashboard showing date controls, production metrics, and summary rows](docs/assets/full-webpage.png)
 
-The dashboard turns raw bronze tally tables into an interactive, read-only view
-for production teams. Users can choose a reporting window, review summarized
-performance, inspect board-foot distributions, and open the complete data behind
-an individual tally report.
+*Fictional branding and deterministic demo data are used throughout these screenshots.*
 
-The current demo supports the **Board Edger** PLC. Additional PLC choices are
-represented in the interface but remain disabled until their data contracts and
-report mappings are available.
+## Status
 
-## Features
+The dashboard is production-oriented and includes:
 
-- Independent date-range selection plus 7-, 30-, 90-, and all-date presets, defaulting to the prior Pacific production day
-- PLC selection prepared for multiple production systems
-- Production overview cards for adjusted run time/days, input, total output, and projected value
-- Horizontally scrollable production summary with a sticky report-date column
-- Configurable production columns with select-all and deselect-all controls
-- Product breakdown by width and length with graph and proportional board views
-- Product piece counts, board feet, percentages, size/piece sorting, and Pareto 80/20 analysis
-- Board-foot charts grouped by grade, thickness, width, or length without interaction-time reloads
-- Naturally ordered chart categories, including fractions and numbered grades
-- Scrollable reject-reason summary
-- Complete report detail view with expandable raw JSON
-- Newest-first background prefetching for delay-free report detail navigation
-- Shared cursor-following, viewport-aware chart and board tooltips
-- Scroll-aware sidebar navigation with synchronized URL hashes
-- Responsive desktop, tablet, and mobile layouts
-- Loading, empty, retry, and network-error states
+- an nginx-based multi-stage container image;
+- deterministic demo data that never contacts a production API;
+- unit, component, accessibility, build, and browser tests;
+- a release gate that must pass before an image is published;
+- immutable commit tags and registry digests for production deployment;
+- read-only API proxy enforcement and API-aware container health;
+- session-only handling of operational data in the browser; and
+- documented deployment security and acceptance checks.
+
+Production use still requires site-specific network controls, monitoring,
+rollback procedures, and acceptance testing. See the
+[production security baseline](docs/SECURITY.md).
+
+## Capabilities
+
+- Independent reporting dates with 7-, 30-, 90-, and all-date presets
+- Production summaries for run time, production days, input, output, and value
+- Configurable tabular columns with sticky identifiers and responsive overflow
+- Product analysis by width and length in chart and proportional-board views
+- Piece count, board-foot, percentage, sorting, and Pareto analysis
+- Board-foot distributions by grade, thickness, width, or length
+- Naturally ordered dimensions, fractional sizes, and numbered grades
+- Reject-reason summaries
+- Complete report details with expandable source JSON
+- Background report prefetching for responsive navigation
+- Shared viewport-aware visualization tooltips
+- Scroll-aware navigation with synchronized URL fragments
+- Desktop, tablet, and mobile layouts
+- Explicit loading, empty, retry, validation, and network-error states
+
+The current production adapter supports one PLC data contract. The interface is
+structured for additional production systems as their contracts become
+available.
+
+## Product tour
+
+### Product breakdown
+
+Compare output by board dimensions in a conventional bar chart or as
+proportional boards.
+
+![Product breakdown bar chart grouped by board dimensions](docs/assets/product-breakdown.png)
+
+![Product breakdown rendered as proportional boards](docs/assets/product-breakdown_boards.png)
+
+### Grade mix and rejects
+
+Review board-foot distribution by grade alongside aggregated reject reasons.
+
+![Board feet by grade chart and reject-reason summary](docs/assets/grade-mix_rejects.png)
+
+### Report detail
+
+Open an individual source report, review its normalized metrics, and inspect the
+raw source record when troubleshooting or validating results.
+
+![Complete report view with production metrics and expandable raw JSON](docs/assets/raw-reports.png)
+
+## Architecture
+
+```text
+Browser
+  ├── static React application
+  └── same-origin /api requests
+          └── nginx read-only proxy
+                  └── private tally API
+```
+
+The upstream service exposes source tables rather than dashboard-specific
+aggregates. The browser adapter paginates those tables, normalizes payloads,
+joins related records, applies the selected reporting range, and calculates the
+display aggregates. In-flight reads are shared and completed tables have a
+one-minute in-memory freshness window.
+
+Production API data is not written to IndexedDB, Cache Storage, local storage,
+or the service-worker cache. Startup also removes IndexedDB databases created by
+older releases.
 
 ## Technology
 
 | Area | Technology |
 |---|---|
-| Interface | React 19 and TypeScript |
+| Interface | React and TypeScript |
 | Build tooling | Vite |
 | Server state | TanStack Query |
 | Charts | Recharts |
-| Styling | Responsive plain CSS |
+| Styling | Responsive CSS |
+| Production server | nginx |
 | Unit and component tests | Vitest and Testing Library |
 | Accessibility checks | axe-core |
 | Browser tests | Playwright |
+| Packaging | Docker and Docker Compose |
 
-## Architecture
+## Demo
 
-The application is a client-side dashboard served through Vite. During
-development and preview, browser requests use the same-origin `/api` path and
-Vite proxies them to the configured Bronze API.
+### Requirements
 
-```text
-Browser
-  ├── React dashboard
-  └── /api requests
-          └── Vite proxy
-                  └── Bronze tally API
-```
-
-The upstream service exposes source tables rather than dashboard-specific
-aggregates. The API adapter therefore paginates table reads, unwraps bronze row
-payloads, joins records by `file_id`, applies the selected date range, and
-calculates chart totals locally. Table requests are shared between panels and
-cached briefly to avoid redundant network traffic.
-
-See the [Sequoia API reference](docs/SFP_API.md) and [North Fork API
-reference](docs/NFL_API.md) for mill-specific endpoints, response envelopes,
-and application assumptions.
-
-## Getting started
-
-### Prerequisites
-
-- Node.js 22 LTS or another currently supported LTS release
+- Node.js 22 LTS
 - npm
-- Network access to a compatible Bronze tally API
 
-### Installation
-
-```bash
-git clone <repository-url>
-cd lumber-tally-dashboard
-npm install
-```
-
-The launchers start normally unless explicitly given the `-demo` tag. Demo mode
-generates deterministic fixtures, forces a local-only mock data source for the
-configured mill profile, and
-serves the dashboard at `http://localhost:5173/`:
+Install the locked dependencies:
 
 ```bash
-FAKE_DATA_SEED=my-demo sh ./bin/start.sh -demo
+npm ci
 ```
 
-On Windows, run `bin\start.bat -demo`. Demo mode overrides every profile's API
-adapter with the in-process fixture implementation, so it makes no `/api`
-requests. Each run generates reports for the latest 90 calendar days, including
-the day it starts. Running either launcher without the tag does not generate
-data and uses the configured mill and upstream API.
+Start the deterministic demo on Linux or macOS:
 
-### Docker
+```bash
+FAKE_DATA_SEED=demo-seed-v1 sh ./bin/start.sh -demo
+```
 
-Build the runtime image:
+On Windows:
+
+```bat
+bin\start.bat -demo
+```
+
+Open `http://localhost:5173`. Demo mode uses generated in-process fixtures and
+does not create an API proxy or contact a production service. It uses the
+fictional Cascade Timber Works profile so public screenshots and demonstrations
+remain separate from real deployment branding.
+
+### Demo container
+
+Build and run the production container with demo data:
 
 ```bash
 docker build -f docker/Dockerfile -t lumber-tally-dashboard .
-```
-
-Run it safely with generated demo data:
-
-```bash
 docker run --rm --init -p 8080:8080 lumber-tally-dashboard
 ```
 
-With no overrides, the image uses Agwood branding, generates the latest 90 days,
-and replaces the data adapter with the in-process fixture. Set `MILL_ID` to
-`sequoia` or `north-fork` to retain that profile's branding with the same fake
-data. Mill selection happens when the container starts, so the same published
-image can be used for every deployment.
+Open `http://localhost:8080`.
 
-For a real API, disable demo mode and provide the mill and an API origin
-reachable from inside the container:
+## Production deployment
 
-```bash
-docker run --rm --init -p 8080:8080 \
-  -e DEMO_MODE=false \
-  -e MILL_ID=sequoia \
-  -e TALLY_API_BASE_URL=http://host.docker.internal:7304 \
-  lumber-tally-dashboard
-```
-
-Do not use `127.0.0.1` for a service running on the Docker host; inside the
-container it refers to the dashboard container itself. Nginx serves the static
-production bundle on port 8080 and proxies same-origin `/api` requests to the
-configured upstream.
-
-#### TrueNAS / repository deployment
-
-The repository includes `docker/compose.yaml` for pulling and running the
-published GHCR image. Keep deployment values in an ignored `docker/.env` file,
-and set the required `DASHBOARD_IMAGE` to a commit-specific tag or digest:
+The repository includes [docker/compose.yaml](docker/compose.yaml) for running a
+published image. Copy the environment template and replace every deployment
+placeholder before starting it:
 
 ```bash
 cp docker/.env.example docker/.env
@@ -155,226 +163,178 @@ docker compose --env-file docker/.env -f docker/compose.yaml pull
 docker compose --env-file docker/.env -f docker/compose.yaml up -d
 ```
 
-Every successful main-branch publish records the immutable `image@sha256:...`
-reference in its GitHub Actions job summary. Prefer that value for TrueNAS.
-
-Compose defaults to the safe demo mode, the Agwood visual profile, host port
-8080, and a restart policy appropriate for a long-running appliance. Configure
-the deployment with environment variables in TrueNAS or a repository-adjacent
-`.env` file:
-
-```dotenv
-DASHBOARD_IMAGE=ghcr.io/lolson3/lumber-tally-dashboard:COMMIT_SHA
-DEMO_MODE=true
-MILL_ID=agwood
-DASHBOARD_HOST_PORT=8080
-FAKE_DATA_SEED=demo-seed-v1
-```
-
-No volume is required: demo fixtures are recreated inside the container on each
-start. To connect real data, set `DEMO_MODE=false` and provide an API URL that is
-reachable from the container. The Compose service drops Linux capabilities,
-prevents privilege escalation, and provides a dependency-aware image health
-check for TrueNAS. It first checks nginx through `/healthz`; real Sequoia and
-North Fork profiles must also reach their configured API health resource. Demo
-and in-process mock profiles have no external API dependency.
-
-`/healthz` remains a liveness diagnostic and can still return 200 while an API
-is unavailable. `/readyz` and the Docker container health status include the API
-dependency and are the production readiness signals. If TrueNAS uses an HTTP
-health probe instead of Docker image health, configure it to request `/readyz`.
-Plain Docker Compose reports an unhealthy container but does not restart it
-solely because of that status; configure any desired recovery behavior in
-TrueNAS.
-
-Production access is restricted to the intended local network and uses the
-TrueNAS IP and configured host port. Do not create a public DNS route or router
-port-forwarding rule. See [the production security baseline](docs/SECURITY.md).
-
-### API configuration
-
-Copy the production container environment template:
-
-```bash
-cp docker/.env.example docker/.env
-```
-
 PowerShell equivalent:
 
 ```powershell
 Copy-Item docker/.env.example docker/.env
+docker compose --env-file docker/.env -f docker/compose.yaml pull
+docker compose --env-file docker/.env -f docker/compose.yaml up -d
 ```
 
-For the nginx production container, use runtime variables:
+Use an immutable image digest from a successful release workflow:
 
 ```dotenv
+DASHBOARD_IMAGE=ghcr.io/lolson3/lumber-tally-dashboard@sha256:<published-digest>
 DEMO_MODE=false
-MILL_ID=sequoia
-TALLY_API_BASE_URL=http://tally-api-host:7304
+MILL_ID=<configured-profile>
+TALLY_API_BASE_URL=http://<private-api-host>:<port>
 DASHBOARD_HOST_PORT=8080
 ```
 
-`MILL_ID` selects a typed branding and operational profile. Available profiles
-are `sequoia`, `north-fork`, and `agwood`. Profiles control the company name,
-theme, icons, timezone, PLC availability, date defaults, API adapter, and PWA
-manifest. `TALLY_API_BASE_URL` overrides the selected mill-specific API origin.
-`SFP_API_BASE_URL` and `NFL_API_BASE_URL` can instead provide reusable defaults.
-Non-demo Sequoia and North Fork containers fail startup when no API origin is
-configured.
+`TALLY_API_BASE_URL` must be reachable from inside the dashboard container. A
+service running on the container host generally cannot be reached through
+`127.0.0.1`, because that address refers to the dashboard container itself.
 
-Local Vite development instead uses the corresponding build-time variables in
-a root `.env.local` file:
+No application data volume is required. Deployment values belong in ignored
+environment files or the host's configuration store; never commit private
+addresses or credentials.
+
+### Runtime configuration
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `DASHBOARD_IMAGE` | Compose | Immutable commit tag or registry digest |
+| `DEMO_MODE` | Yes | Enables deterministic fixtures when `true` |
+| `MILL_ID` | Yes | Selects the installed branding and operational profile |
+| `TALLY_API_BASE_URL` | Real data | Private upstream API origin |
+| `DASHBOARD_HOST_PORT` | No | Host port mapped to nginx; defaults to `8080` |
+| `FAKE_DATA_SEED` | Demo only | Reproducible demo-data seed |
+
+The container validates its runtime settings and fails startup when a real-data
+profile is missing its API origin. The selected profile controls branding,
+theme, timezone, icons, PLC availability, date behavior, adapter selection, and
+install metadata.
+
+### Health checks
+
+| Endpoint | Meaning |
+|---|---|
+| `/healthz` | nginx is running and serving requests |
+| `/readyz` | nginx and the configured API dependency are available |
+
+The image's Docker health check requires both conditions. Demo and in-process
+mock profiles have no external API dependency. If the host uses an HTTP health
+probe instead of Docker image health, configure it to request `/readyz`.
+
+An unhealthy status does not automatically restart a plain Docker Compose
+container. Restart and alert behavior must be configured in the deployment
+platform.
+
+### Network and security model
+
+The current production model is intended for a trusted local network:
+
+- nginx is reached by host IP and the configured port;
+- firewall or VLAN policy limits access to approved local devices;
+- the application does not maintain user accounts;
+- the proxy permits only `GET` and `HEAD` requests to `/api/`;
+- API responses are marked `Cache-Control: no-store`;
+- browser cookies and authorization headers are not forwarded upstream; and
+- the service must not be exposed through public DNS or router port forwarding.
+
+Anyone who can reach the service can read the dashboard. If per-user identity,
+revocation, audit logging, or access from an untrusted network becomes a
+requirement, place an authenticated HTTPS reverse proxy in front of it.
+
+Serving the application by HTTP at a private IP is supported, but browsers do
+not treat that as a secure context. Installable PWA and service-worker features
+may therefore be unavailable even though the dashboard itself functions.
+
+## Releases
+
+Pull requests and non-main pushes run the reusable release gate. A main-branch
+publish invokes that same gate and cannot publish until it succeeds. The gate
+runs the application tests, builds the production bundle and container, checks
+the proxy security behavior, and verifies that container health becomes
+unhealthy when its API dependency disappears.
+
+A successful publish produces:
+
+- a full Git commit tag;
+- the convenience tag `latest`; and
+- an immutable `image@sha256:...` reference in the workflow summary.
+
+Production deployments must use the commit tag or digest, never `latest`.
+
+## Development
+
+Create a root `.env.local` from [.env.example](.env.example) and supply only the
+values required by the selected development profile. Common variables include:
 
 ```dotenv
-VITE_TALLY_API_BASE_URL=http://tally-api-host:7304
-VITE_MILL_ID=sequoia
+VITE_MILL_ID=<configured-profile>
+VITE_TALLY_API_BASE_URL=http://<private-api-host>:<port>
 VITE_DASHBOARD_PORT=5173
-VITE_ALLOWED_HOSTS=tally.biztechro.com
+VITE_ALLOWED_HOSTS=<comma-separated-hostnames>
 ```
 
-Start from the tracked template with `cp .env.example .env.local` or
-`Copy-Item .env.example .env.local` in PowerShell.
-
-`VITE_DASHBOARD_PORT` controls both the development/start server and the preview
-server. It defaults to `5173` when omitted and must be an available port from 1
-through 65535.
-
-`VITE_ALLOWED_HOSTS` is a comma-separated list of hostnames permitted to access
-the local Vite server. It is not used by the nginx production container.
-
-Environment files are ignored by Git. Do not commit credentials or private
-deployment addresses.
-
-### Development
+Start the development server:
 
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:5173`. The development server listens on all interfaces,
-so permitted devices on the same network can also connect through the host
-machine's address when firewall rules allow it.
+Vite is a development and build-verification server. Production deployments use
+the nginx container.
 
-## Testing
-
-Run unit, component, integration, and accessibility tests:
+## Verification
 
 ```bash
+# Unit, component, API-adapter, and accessibility tests
 npm test
-```
 
-Run Playwright browser tests:
-
-```bash
+# Production build and browser workflows
 npm run test:e2e
-```
 
-Run the complete production verification pipeline:
-
-```bash
+# Complete local application pipeline
 npm run test:all
 ```
 
-`test:all` runs the Vitest suite, performs a TypeScript production build, and
-executes the Playwright desktop and mobile workflows. The GitHub release gate
-also builds the production container, verifies its security behavior, and proves
-that container health changes to unhealthy when the API disappears. Main-branch
-images are published only after this reusable gate succeeds.
-
-Run the read-only live SFP contract and performance gate from a machine that
-can reach the configured private API:
-
-```bash
-npm run verify:sfp
-```
-
-The verifier reads the API origin from ignored environment configuration,
-without printing it, and validates every required endpoint, pagination,
-field types/nullability, cross-table references, dashboard/source aggregation
-parity, and concurrent cold-load timing. It never writes to the API.
-
-## Production build
-
-```bash
-npm run build
-npm run preview
-```
-
-The compiled static assets are written to `dist/`, and the preview server is
-available at `http://localhost:5173` by default. Vite preview is intended for
-build verification. The production Docker image uses a multi-stage build and
-copies only `dist/` into its nginx runtime stage; Node.js, source files, and
-development dependencies are not included in the final image.
-
-## Installable app (PWA)
-
-The dashboard includes a web app manifest, platform-specific icons, and an
-application-shell service worker. Supported browsers can install it on Windows,
-macOS, Android, iOS, iPadOS, ChromeOS, and Linux, subject to each platform's
-browser support. The installed shell can launch without a connection, while
-live production data still requires access to the Bronze API. API responses are
-deliberately excluded from offline caches so operational data is never presented
-as current after becoming stale. All profiles keep table data out of IndexedDB;
-their data cache exists only in browser memory, and startup removes databases
-created by older releases.
-
-Build and serve the application normally, then use the browser's **Install app**
-or **Add to Home Screen** action. Service workers require a secure context:
-`localhost` is accepted for local use, but access from other devices must be
-served through trusted HTTPS. For private-network deployment, place the running
-dashboard behind an HTTPS reverse proxy with SPA fallback and `/api` forwarding.
-
-The [Windows](bin/start.bat) and [Unix](bin/start.sh) launchers are suitable for
-a scheduler or service manager, but they start Vite over HTTP. An HTTPS proxy is
-therefore still required for installation from phones, tablets, and other LAN
-devices.
+Automated browser tests use deterministic fixtures. A production deployment
+must also complete the environment-specific checks in
+[docs/SECURITY.md](docs/SECURITY.md), including LAN isolation, source-data
+comparison, dependency failure, restart, and rollback testing.
 
 ## Project structure
 
 ```text
 src/
-  api/                 Bronze API adapter and domain types
-  components/          Feature-focused React components
-    charts/
-    data-selection/
-    production/
-    reports/
-    sidebar/
-  hooks/               React lifecycle and interaction behavior
-  utils/               Data transformations, formatting, and positioning
-  test/                Unit, component, accessibility, and browser tests
-  App.tsx               Shared state, queries, and page composition
-  main.tsx              React and TanStack Query bootstrap
-  styles.css            Responsive visual system
-docs/
-  SFP_API.md            Sequoia Forest Products API integration contract
-  NFL_API.md            North Fork Lumber API integration contract
-  SECURITY.md           LAN-only production security baseline and checks
+  api/                  API adapter, normalization, and data-retention controls
+  components/           Dashboard interface regions
+  config/               Runtime profiles and branding
+  hooks/                React lifecycle and interaction behavior
+  test/                 Unit, component, accessibility, and browser tests
+  utils/                Data transformations and formatting
+  App.tsx                Application orchestration
+  main.tsx               React and query-client bootstrap
+  styles.css             Responsive visual system
 public/
-  img/                  Mill logos and favicon
-  icons/                Standard, maskable, and Apple installation icons
-  offline.html          Offline navigation fallback
+  icons/                PWA and platform icons
+  img/                  Runtime-selected branding assets
+  offline.html          Static offline shell
   sw.js                 Application-shell service worker
-vite.config.ts          Build config and generated PWA manifest
+docker/
+  Dockerfile            Multi-stage build and unprivileged nginx runtime
+  compose.yaml          Published-image service definition
+  nginx.conf.template   Static server, security headers, and API proxy
+  healthcheck.sh        Liveness and dependency readiness check
+bin/
+  start.bat             Windows launcher
+  start.sh              Unix launcher
+docs/                   Internal architecture, integration, and security records
 ```
 
-## Demo limitations and production considerations
+## Known boundaries
 
-- Only Board Edger data is currently selectable.
-- The API does not currently provide server-side date filtering or dashboard
-  aggregates, which requires the client to retrieve and process complete source
-  tables.
-- Initial load time depends on the API's response latency and dataset size.
-- Access is restricted by the deployment-owned LAN and firewall policy described
-  in [the security baseline](docs/SECURITY.md); the application does not maintain
-  user accounts.
-- Production still requires the deployment owner to apply and verify the
-  documented network, TrueNAS, monitoring, and support controls.
-- Automated tests use deterministic API fixtures; validation against the live
-  environment remains part of deployment acceptance.
+- The dashboard is read-only and does not modify source data.
+- Only the currently integrated PLC contract is enabled.
+- The source API does not provide dashboard-specific aggregates or date-filtered
+  queries, so initial load time grows with source-table size and API latency.
+- Operational records are processed in the browser and retained only for the
+  active browser session.
+- Network-only authorization is appropriate only for the agreed trusted-LAN
+  deployment model.
 
 ## License
 
-This repository currently uses the [Apache License 2.0](LICENSE). If the demo is
-developed into a proprietary commercial product, the project owner should review
-the licensing and ownership strategy before distributing additional releases.
+Licensed under the [Apache License 2.0](LICENSE).

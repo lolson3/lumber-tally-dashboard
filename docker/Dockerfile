@@ -11,7 +11,7 @@ RUN npm run build
 FROM nginx:1.30.4-alpine AS runtime
 
 ENV DEMO_MODE=true \
-    MILL_ID=agwood \
+    MILL_ID=cascade \
     FAKE_DATA_SEED=demo-seed-v1 \
     DASHBOARD_PORT=8080
 

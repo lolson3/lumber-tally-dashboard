@@ -1,5 +1,5 @@
 export interface DashboardRuntimeConfig {
-  millId?: "sequoia" | "north-fork" | "agwood";
+  millId?: "sequoia" | "north-fork" | "agwood" | "cascade";
   demoMode?: boolean;
   fakeDataSeed?: string;
 }

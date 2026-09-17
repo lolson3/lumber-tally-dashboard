@@ -1,6 +1,7 @@
 const sfpLogo = "/img/sfp-logo.png";
 const nflLogo = "/img/nfl-logo-enhanced.png";
 const agwoodLogo = "/img/AML-logo-white.png";
+const cascadeLogo = "/img/mtn-silhouette.png";
 
 export const allPlcs = [
   "Board Edger", "Chopsaw", "Twin", "BakerInFeed", "Single", "Gang",
@@ -8,7 +9,7 @@ export const allPlcs = [
 ] as const;
 
 export type PlcOption = (typeof allPlcs)[number];
-export type MillId = "sequoia" | "north-fork" | "agwood";
+export type MillId = "sequoia" | "north-fork" | "agwood" | "cascade";
 
 export interface MillProfile {
   id: MillId;
@@ -41,6 +42,7 @@ export interface MillProfile {
     sidebarText: string;
     themeColor: string;
     background: string;
+    logoFilter?: string;
   };
 }
 
@@ -109,10 +111,40 @@ export const millProfiles: Record<MillId, MillProfile> = {
     icons: sharedIcons,
     theme: { primary: "#174f36", primarySoft: "#dcece3", accent: "#2f7d52", metric: "#4c956c", action: "#246b47", focus: "#2f7d52", sidebarText: "#e6f3eb", themeColor: "#174f36", background: "#f4f8f5" },
   },
+  cascade: {
+    id: "cascade",
+    companyName: "Cascade Timber Works",
+    dashboardName: "Lumber Tally Dashboard",
+    shortName: "Cascade Tally",
+    description: "Demonstration dashboard for Cascade Timber Works lumber tally reports.",
+    timeZone: "America/Los_Angeles",
+    api: {
+      adapter: "mock",
+      defaultOrigin: "",
+      documentation: "",
+    },
+    defaultPlc: "Board Edger",
+    initialReportRange: "all",
+    enabledPlcs: ["Board Edger"],
+    logo: cascadeLogo,
+    icons: sharedIcons,
+    theme: {
+      primary: "#173f5f",
+      primarySoft: "#e1f0f7",
+      accent: "#247a9f",
+      metric: "#5a9fc0",
+      action: "#1b6688",
+      focus: "#2f8fb7",
+      sidebarText: "#eaf7fc",
+      themeColor: "#173f5f",
+      background: "#f3f8fb",
+      logoFilter: "brightness(0) invert(1)",
+    },
+  },
 };
 
 export function getMillProfile(id: string | undefined) {
-  const millId = id || "sequoia";
+  const millId = id || "cascade";
   if (!(millId in millProfiles)) throw new Error(`Unknown VITE_MILL_ID: ${millId}`);
   return millProfiles[millId as MillId];
 }

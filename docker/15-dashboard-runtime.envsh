@@ -15,11 +15,11 @@ if [ "$dashboard_port" -lt 1024 ] || [ "$dashboard_port" -gt 65535 ]; then
   exit 1
 fi
 
-dashboard_mill_id="${MILL_ID:-${VITE_MILL_ID:-agwood}}"
+dashboard_mill_id="${MILL_ID:-${VITE_MILL_ID:-cascade}}"
 case "$dashboard_mill_id" in
-  sequoia|north-fork|agwood) ;;
+  sequoia|north-fork|agwood|cascade) ;;
   *)
-    echo "ERROR: MILL_ID must be sequoia, north-fork, or agwood." >&2
+    echo "ERROR: MILL_ID must be sequoia, north-fork, agwood, or cascade." >&2
     exit 1
     ;;
 esac
@@ -47,7 +47,10 @@ if [ -z "$dashboard_api_base" ]; then
   esac
 fi
 
-if [ "$dashboard_demo_mode" = false ] && [ "$dashboard_mill_id" != agwood ] && [ -z "$dashboard_api_base" ]; then
+if [ "$dashboard_demo_mode" = false ] \
+  && [ "$dashboard_mill_id" != agwood ] \
+  && [ "$dashboard_mill_id" != cascade ] \
+  && [ -z "$dashboard_api_base" ]; then
   echo "ERROR: TALLY_API_BASE_URL is required for a non-demo mill deployment." >&2
   exit 1
 fi
@@ -70,7 +73,9 @@ if printf '%s' "$dashboard_api_base" | grep -Eq '[[:space:]]'; then
   exit 1
 fi
 
-if [ "$dashboard_demo_mode" = true ] || [ "$dashboard_mill_id" = agwood ]; then
+if [ "$dashboard_demo_mode" = true ] \
+  || [ "$dashboard_mill_id" = agwood ] \
+  || [ "$dashboard_mill_id" = cascade ]; then
   dashboard_health_target="http://127.0.0.1:${dashboard_port}/healthz"
 else
   case "$dashboard_mill_id" in

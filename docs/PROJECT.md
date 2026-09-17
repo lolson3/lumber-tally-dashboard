@@ -194,8 +194,9 @@ Utilities own reusable calculations that do not depend on React.
 
 ## Configuration and deployment
 
-Production containers select the `sequoia`, `north-fork`, or `agwood` profile at
-startup with `MILL_ID`. The entrypoint validates runtime settings, writes the
+Production containers select an installed real-data profile or the fictional
+`cascade` demo profile at startup with `MILL_ID`. The entrypoint validates
+runtime settings, writes the
 browser-safe `runtime-config.js`, selects the matching prebuilt PWA manifest,
 and configures nginx with `TALLY_API_BASE_URL`. The same immutable image can
 therefore serve every mill without rebuilding it. Real mill deployments fail
