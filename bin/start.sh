@@ -68,7 +68,13 @@ case "$START_MODE" in
     ;;
 esac
 
-if ! command -v nginx >/dev/null 2>&1; then
+if command -v nginx >/dev/null 2>&1; then
+  NGINX_EXE=$(command -v nginx)
+elif [ -x /usr/sbin/nginx ]; then
+  NGINX_EXE=/usr/sbin/nginx
+elif [ -x /usr/local/sbin/nginx ]; then
+  NGINX_EXE=/usr/local/sbin/nginx
+else
   echo "ERROR: nginx is required for native production mode." >&2
   exit 1
 fi
@@ -109,7 +115,7 @@ else
 fi
 
 echo "Validating nginx configuration..."
-nginx -t -p "$RUNTIME_DIR/" -c "$RUNTIME_DIR/nginx.conf"
+"$NGINX_EXE" -t -p "$RUNTIME_DIR/" -c "$RUNTIME_DIR/nginx.conf"
 
 echo "Starting Lumber Tally Dashboard with nginx..."
-exec nginx -p "$RUNTIME_DIR/" -c "$RUNTIME_DIR/nginx.conf" -g "daemon off;"
+exec "$NGINX_EXE" -p "$RUNTIME_DIR/" -c "$RUNTIME_DIR/nginx.conf" -g "daemon off;"
