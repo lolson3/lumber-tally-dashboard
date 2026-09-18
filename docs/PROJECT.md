@@ -182,8 +182,8 @@ docker/
   nginx.conf.template   Production static server and API proxy configuration
   15-dashboard-runtime.envsh  Validated container startup configuration
 bin/
-  start.bat             Windows development/demo launcher
-  start.sh              Unix development/demo launcher
+  start.bat             Windows production/development/demo launcher
+  start.sh              Unix production/development/demo launcher
   verify-sfp-api.mjs    Read-only live SFP contract and performance gate
 vite.config.ts          Build config and mill-specific PWA manifest generation
 ```

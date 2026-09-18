@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "build:e2e": "tsc -b && vite build --mode e2e",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run",
+    "test": "vitest run && node --test bin/prepare-native-runtime.test.mjs",
     "test:watch": "vitest",
     "test:e2e": "npm run build:e2e && playwright test",
     "test:all": "npm test && npm run test:e2e",

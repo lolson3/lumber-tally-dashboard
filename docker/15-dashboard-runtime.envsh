@@ -4,6 +4,7 @@
 # nginx configuration template, so exported values remain available to envsubst.
 
 dashboard_port="${DASHBOARD_PORT:-8080}"
+dashboard_html_root="${DASHBOARD_HTML_ROOT:-/usr/share/nginx/html}"
 case "$dashboard_port" in
   ""|*[!0-9]*)
     echo "ERROR: DASHBOARD_PORT must be an integer between 1024 and 65535." >&2
@@ -84,16 +85,17 @@ else
   esac
 fi
 
-manifest_source="/usr/share/nginx/html/manifests/$dashboard_mill_id.webmanifest"
+manifest_source="$dashboard_html_root/manifests/$dashboard_mill_id.webmanifest"
 if [ ! -f "$manifest_source" ]; then
   echo "ERROR: Missing web manifest for mill profile '$dashboard_mill_id'." >&2
   exit 1
 fi
 
-cp "$manifest_source" /usr/share/nginx/html/manifest.webmanifest
-cat > /usr/share/nginx/html/runtime-config.js <<EOF
+cp "$manifest_source" "$dashboard_html_root/manifest.webmanifest"
+cat > "$dashboard_html_root/runtime-config.js" <<EOF
 window.__LUMBER_TALLY_CONFIG__ = {"millId":"$dashboard_mill_id","demoMode":$dashboard_demo_mode,"fakeDataSeed":"$dashboard_seed"};
 EOF
 
 export TALLY_API_BASE_URL="$dashboard_api_base"
 export DASHBOARD_HEALTH_TARGET="$dashboard_health_target"
+export DASHBOARD_HTML_ROOT="$dashboard_html_root"

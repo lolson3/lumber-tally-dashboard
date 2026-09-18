@@ -126,13 +126,13 @@ npm ci
 Start the deterministic demo on Linux or macOS:
 
 ```bash
-FAKE_DATA_SEED=demo-seed-v1 sh ./bin/start.sh -demo
+FAKE_DATA_SEED=demo-seed-v1 sh ./bin/start.sh --demo
 ```
 
 On Windows:
 
 ```bat
-bin\start.bat -demo
+bin\start.bat --demo
 ```
 
 Open `http://localhost:5173`. Demo mode uses generated in-process fixtures and
@@ -150,6 +150,46 @@ docker run --rm --init -p 8080:8080 lumber-tally-dashboard
 ```
 
 Open `http://localhost:8080`.
+
+### Native nginx service
+
+A Linux VM can run the same production architecture without a container. It
+requires Node.js 22 LTS, npm, and nginx. Copy the root environment template and
+configure the production profile and API running on the VM:
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+MILL_ID=sequoia
+DEMO_MODE=false
+TALLY_API_BASE_URL=http://127.0.0.1:7304
+DASHBOARD_PORT=8080
+```
+
+Start the service from the repository root:
+
+```bash
+./bin/start.sh
+```
+
+The launcher installs locked dependencies when necessary, builds `dist/`,
+generates the selected manifest and runtime configuration, renders an isolated
+nginx configuration under `.runtime/nginx/`, validates it, and runs nginx in the
+foreground. Process or service-manager environment variables override values in
+the root `.env`. The service account must own or have write access to the cloned
+repository because the launcher writes `node_modules/`, `dist/`, and `.runtime/`.
+
+For systemd, use `Type=simple`, set `WorkingDirectory` to the repository root,
+and set `ExecStart` to the absolute path of `bin/start.sh`. Configure
+`Restart=on-failure` and start it only after the local API and network are
+available. The equivalent Windows launcher is `bin\start.bat` when a native
+nginx installation is available.
+
+Native production mode is the default. `--production` is an explicit alias,
+`--dev` starts Vite against a real API for development, and `--demo` always
+starts the deterministic Vite demo without contacting an API.
 
 ## Production deployment
 
@@ -319,8 +359,10 @@ docker/
   nginx.conf.template   Static server, security headers, and API proxy
   healthcheck.sh        Liveness and dependency readiness check
 bin/
-  start.bat             Windows launcher
-  start.sh              Unix launcher
+  start.bat             Windows native-nginx, development, and demo launcher
+  start.sh              Unix native-nginx, development, and demo launcher
+  prepare-native-runtime.mjs
+                        Native runtime and nginx configuration generator
 docs/                   Internal architecture, integration, and security records
 ```
 

@@ -38,10 +38,14 @@ if not "%DEMO_MODE%"=="" (
   exit /b 2
 )
 :parse_args
-if "%~1"=="" goto start_normal
+if "%~1"=="" goto start_production
+if /i "%~1"=="-production" goto start_production_arg
+if /i "%~1"=="--production" goto start_production_arg
 if /i "%~1"=="-demo" goto start_demo
 if /i "%~1"=="--demo" goto start_demo
-echo ERROR: Unknown option "%~1". Use -demo to run with fake data.
+if /i "%~1"=="-dev" goto start_dev
+if /i "%~1"=="--dev" goto start_dev
+echo ERROR: Unknown option "%~1". Use --demo, --dev, or --production.
 exit /b 2
 
 :start_demo_env
@@ -62,7 +66,70 @@ echo Starting Lumber Tally Dashboard in DEMO mode...
 call npm start -- --mode demo
 exit /b %errorlevel%
 
-:start_normal
-echo Starting Lumber Tally Dashboard...
+:start_dev
+if not "%~2"=="" (
+  echo ERROR: Development mode does not accept additional arguments.
+  exit /b 2
+)
+echo Starting Lumber Tally Dashboard with the Vite development server...
 call npm start
+exit /b %errorlevel%
+
+:start_production_arg
+if not "%~2"=="" (
+  echo ERROR: Production mode does not accept additional arguments.
+  exit /b 2
+)
+
+:start_production
+set "NGINX_EXE="
+for /f "delims=" %%I in ('where nginx 2^>nul') do if not defined NGINX_EXE set "NGINX_EXE=%%I"
+if not defined NGINX_EXE (
+  echo ERROR: nginx is required for native production mode.
+  exit /b 1
+)
+
+echo Building the production dashboard...
+call npm run build
+if errorlevel 1 exit /b 1
+
+if defined DASHBOARD_RUNTIME_DIR (
+  set "RUNTIME_DIR=%DASHBOARD_RUNTIME_DIR%"
+) else (
+  set "RUNTIME_DIR=%CD%\.runtime\nginx"
+)
+if not exist "%RUNTIME_DIR%" mkdir "%RUNTIME_DIR%"
+if errorlevel 1 exit /b 1
+for %%I in ("%RUNTIME_DIR%") do set "RUNTIME_DIR=%%~fI"
+
+if defined NGINX_MIME_TYPES goto validate_mime_types
+for %%I in ("%NGINX_EXE%") do set "NGINX_INSTALL_DIR=%%~dpI"
+if exist "%NGINX_INSTALL_DIR%conf\mime.types" set "NGINX_MIME_TYPES=%NGINX_INSTALL_DIR%conf\mime.types"
+if not defined NGINX_MIME_TYPES if exist "C:\nginx\conf\mime.types" set "NGINX_MIME_TYPES=C:\nginx\conf\mime.types"
+
+:validate_mime_types
+if not defined NGINX_MIME_TYPES (
+  echo ERROR: nginx mime.types was not found. Set NGINX_MIME_TYPES to its absolute path.
+  exit /b 1
+)
+if not exist "%NGINX_MIME_TYPES%" (
+  echo ERROR: NGINX_MIME_TYPES does not identify an existing file.
+  exit /b 1
+)
+for %%I in ("%NGINX_MIME_TYPES%") do set "NGINX_MIME_TYPES=%%~fI"
+
+set "DEMO_MODE=false"
+if exist ".env" (
+  node --env-file=".env" .\bin\prepare-native-runtime.mjs --project-root "%CD%" --runtime-dir "%RUNTIME_DIR%" --mime-types "%NGINX_MIME_TYPES%"
+) else (
+  node .\bin\prepare-native-runtime.mjs --project-root "%CD%" --runtime-dir "%RUNTIME_DIR%" --mime-types "%NGINX_MIME_TYPES%"
+)
+if errorlevel 1 exit /b 1
+
+echo Validating nginx configuration...
+"%NGINX_EXE%" -t -p "%RUNTIME_DIR%/" -c "%RUNTIME_DIR%\nginx.conf"
+if errorlevel 1 exit /b 1
+
+echo Starting Lumber Tally Dashboard with nginx...
+"%NGINX_EXE%" -p "%RUNTIME_DIR%/" -c "%RUNTIME_DIR%\nginx.conf" -g "daemon off;"
 exit /b %errorlevel%

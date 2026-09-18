@@ -86,6 +86,7 @@ export default defineConfig(({ mode }) => {
     preview: { port: dashboardPort, strictPort: true, allowedHosts, ...(proxy ? { proxy } : {}) },
     test: {
       environment: "jsdom",
+      include: ["src/**/*.test.{ts,tsx}"],
       setupFiles: "./src/test/setup.ts",
       css: true,
     },
